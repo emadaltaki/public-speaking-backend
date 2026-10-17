@@ -152,6 +152,7 @@ func (s *Server) addBooking(w http.ResponseWriter, r *http.Request) {
 		Contact       string `json:"contact"`
 		PreferredTime string `json:"preferredTime"`
 		Reason        string `json:"reason"`
+		Course        string `json:"requestedCourse"`
 		Description   string `json:"description"`
 	}
 	if !decodeJSON(w, r, &req) {
@@ -161,6 +162,7 @@ func (s *Server) addBooking(w http.ResponseWriter, r *http.Request) {
 	req.Contact = strings.TrimSpace(req.Contact)
 	req.PreferredTime = strings.TrimSpace(req.PreferredTime)
 	req.Reason = strings.TrimSpace(req.Reason)
+	req.Course = strings.TrimSpace(req.Course)
 	req.Description = strings.TrimSpace(req.Description)
 	for _, f := range []struct {
 		name, value string
@@ -182,11 +184,17 @@ func (s *Server) addBooking(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
+	// The site sends a short slug such as "intro", "single", "four" or "eight".
+	if req.Course != "" && !gameIDRe.MatchString(req.Course) {
+		writeError(w, http.StatusBadRequest, "requestedCourse must be a lowercase slug like \"four\"")
+		return
+	}
 	b := store.Booking{
 		Name:          req.Name,
 		Contact:       req.Contact,
 		PreferredTime: req.PreferredTime,
 		Reason:        req.Reason,
+		Course:        req.Course,
 		Description:   req.Description,
 	}
 	if u := userFrom(r.Context()); u != nil {

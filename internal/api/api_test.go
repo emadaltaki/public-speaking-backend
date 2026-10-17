@@ -149,9 +149,9 @@ func TestGames(t *testing.T) {
 
 func TestBookings(t *testing.T) {
 	h := newTestServer(t)
-	booking := map[string]any{"name": "Sam", "contact": "sam@example.com", "preferredTime": "Tuesday evening", "reason": "Job interview prep"}
+	booking := map[string]any{"name": "Sam", "contact": "sam@example.com", "preferredTime": "Tuesday evening", "reason": "Job interview prep", "requestedCourse": "four"}
 
-	if rec, body := do(t, h, "POST", "/v1/bookings", "", booking); rec.Code != 201 || body["status"] != "new" || body["reason"] != "Job interview prep" {
+	if rec, body := do(t, h, "POST", "/v1/bookings", "", booking); rec.Code != 201 || body["status"] != "new" || body["reason"] != "Job interview prep" || body["requestedCourse"] != "four" {
 		t.Fatalf("anonymous booking: %d %v", rec.Code, body)
 	}
 	if rec, body := do(t, h, "POST", "/v1/bookings", "alice", booking); rec.Code != 201 || body["uid"] != "alice" {

@@ -46,7 +46,8 @@ type Booking struct {
 	Name          string    `json:"name"`
 	Contact       string    `json:"contact"`
 	PreferredTime string    `json:"preferredTime"`
-	Reason        string    `json:"reason"` // why they want the appointment
+	Reason        string    `json:"reason"`          // why they want the appointment
+	Course        string    `json:"requestedCourse"` // session/package slug they picked, e.g. "four"; may be empty
 	Description   string    `json:"description"`
 	Status        string    `json:"status"` // new, contacted, scheduled, closed
 	CreatedAt     time.Time `json:"createdAt"`

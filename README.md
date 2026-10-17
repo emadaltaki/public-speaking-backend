@@ -34,7 +34,7 @@ All responses are JSON. Errors look like `{"error": "message"}`.
 | POST | `/v1/games/sessions` | user | Record a finished round: `gameId`, `durationSeconds`, optional `score`, optional `details` object |
 | GET | `/v1/games/sessions?gameId=&limit=` | user | Recent rounds, newest first (limit 1–200, default 50) |
 | GET | `/v1/games/progress` | user | Per game: plays, total seconds, best score, last played |
-| POST | `/v1/bookings` | optional | Booking request: `name`, `contact`, `preferredTime`, `reason` (why they want the call), optional `description`. Linked to the user when signed in. Limited to 5 per IP per 10 minutes |
+| POST | `/v1/bookings` | optional | Booking request: `name`, `contact`, `preferredTime`, `reason` (why they want the call), optional `requestedCourse` (the session or package picked: `intro`, `single`, `four` or `eight`), optional `description`. Linked to the user when signed in. Limited to 5 per IP per 10 minutes |
 | GET | `/v1/bookings` | user | The signed-in user's booking requests |
 | GET | `/v1/admin/bookings?limit=` | admin | All booking requests |
 | PATCH | `/v1/admin/bookings/{id}` | admin | Set `status` to `new`, `contacted`, `scheduled` or `closed` |

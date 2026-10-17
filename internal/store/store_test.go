@@ -69,8 +69,8 @@ func TestStoreContract(t *testing.T) {
 				}
 			}
 
-			b, err := st.AddBooking(ctx, Booking{UID: &uid, Name: "Sam", Contact: "x", PreferredTime: "Mon", Reason: "Presentation at work"})
-			if err != nil || b.Status != "new" || b.ID == 0 || b.Reason != "Presentation at work" {
+			b, err := st.AddBooking(ctx, Booking{UID: &uid, Name: "Sam", Contact: "x", PreferredTime: "Mon", Reason: "Presentation at work", Course: "single"})
+			if err != nil || b.Status != "new" || b.ID == 0 || b.Reason != "Presentation at work" || b.Course != "single" {
 				t.Fatalf("add booking: %v %+v", err, b)
 			}
 			mine, _ := st.ListBookingsForUser(ctx, uid)

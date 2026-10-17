@@ -1,0 +1,1 @@
+ALTER TABLE bookings ADD COLUMN IF NOT EXISTS requested_course TEXT NOT NULL DEFAULT '';
