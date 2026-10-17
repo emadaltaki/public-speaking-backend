@@ -136,15 +136,15 @@ func TestGames(t *testing.T) {
 
 func TestBookings(t *testing.T) {
 	h := newTestServer(t)
-	booking := map[string]any{"name": "Sam", "contact": "sam@example.com", "preferredTime": "Tuesday evening"}
+	booking := map[string]any{"name": "Sam", "contact": "sam@example.com", "preferredTime": "Tuesday evening", "reason": "Job interview prep"}
 
-	if rec, body := do(t, h, "POST", "/v1/bookings", "", booking); rec.Code != 201 || body["status"] != "new" {
+	if rec, body := do(t, h, "POST", "/v1/bookings", "", booking); rec.Code != 201 || body["status"] != "new" || body["reason"] != "Job interview prep" {
 		t.Fatalf("anonymous booking: %d %v", rec.Code, body)
 	}
 	if rec, body := do(t, h, "POST", "/v1/bookings", "alice", booking); rec.Code != 201 || body["uid"] != "alice" {
 		t.Fatalf("signed-in booking: %d %v", rec.Code, body)
 	}
-	if rec, _ := do(t, h, "POST", "/v1/bookings", "", map[string]any{"name": "Sam"}); rec.Code != 400 {
+	if rec, _ := do(t, h, "POST", "/v1/bookings", "", map[string]any{"name": "Sam", "contact": "s@x.com", "preferredTime": "Mon"}); rec.Code != 400 {
 		t.Fatalf("missing fields: got %d", rec.Code)
 	}
 
@@ -173,7 +173,7 @@ func TestBookings(t *testing.T) {
 
 func TestBookingRateLimit(t *testing.T) {
 	h := newTestServer(t)
-	booking := map[string]any{"name": "Sam", "contact": "sam@example.com", "preferredTime": "Monday"}
+	booking := map[string]any{"name": "Sam", "contact": "sam@example.com", "preferredTime": "Monday", "reason": "Wedding speech"}
 	var last int
 	for i := 0; i < 6; i++ {
 		rec, _ := do(t, h, "POST", "/v1/bookings", "", booking)

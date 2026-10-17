@@ -171,11 +171,11 @@ func (p *Postgres) GameProgress(ctx context.Context, uid string) ([]GameProgress
 	return out, rows.Err()
 }
 
-const bookingCols = `id, uid, name, contact, preferred_time, description, status, created_at`
+const bookingCols = `id, uid, name, contact, preferred_time, reason, description, status, created_at`
 
 func scanBooking(row pgx.Row) (Booking, error) {
 	var b Booking
-	err := row.Scan(&b.ID, &b.UID, &b.Name, &b.Contact, &b.PreferredTime, &b.Description, &b.Status, &b.CreatedAt)
+	err := row.Scan(&b.ID, &b.UID, &b.Name, &b.Contact, &b.PreferredTime, &b.Reason, &b.Description, &b.Status, &b.CreatedAt)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return b, ErrNotFound
 	}
@@ -197,9 +197,9 @@ func scanBookings(rows pgx.Rows) ([]Booking, error) {
 
 func (p *Postgres) AddBooking(ctx context.Context, b Booking) (Booking, error) {
 	return scanBooking(p.pool.QueryRow(ctx, `
-		INSERT INTO bookings (uid, name, contact, preferred_time, description)
-		VALUES ($1, $2, $3, $4, $5)
-		RETURNING `+bookingCols, b.UID, b.Name, b.Contact, b.PreferredTime, b.Description))
+		INSERT INTO bookings (uid, name, contact, preferred_time, reason, description)
+		VALUES ($1, $2, $3, $4, $5, $6)
+		RETURNING `+bookingCols, b.UID, b.Name, b.Contact, b.PreferredTime, b.Reason, b.Description))
 }
 
 func (p *Postgres) ListBookingsForUser(ctx context.Context, uid string) ([]Booking, error) {

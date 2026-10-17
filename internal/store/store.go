@@ -46,6 +46,7 @@ type Booking struct {
 	Name          string    `json:"name"`
 	Contact       string    `json:"contact"`
 	PreferredTime string    `json:"preferredTime"`
+	Reason        string    `json:"reason"` // why they want the appointment
 	Description   string    `json:"description"`
 	Status        string    `json:"status"` // new, contacted, scheduled, closed
 	CreatedAt     time.Time `json:"createdAt"`

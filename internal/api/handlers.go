@@ -139,6 +139,7 @@ func (s *Server) addBooking(w http.ResponseWriter, r *http.Request) {
 		Name          string `json:"name"`
 		Contact       string `json:"contact"`
 		PreferredTime string `json:"preferredTime"`
+		Reason        string `json:"reason"`
 		Description   string `json:"description"`
 	}
 	if !decodeJSON(w, r, &req) {
@@ -147,6 +148,7 @@ func (s *Server) addBooking(w http.ResponseWriter, r *http.Request) {
 	req.Name = strings.TrimSpace(req.Name)
 	req.Contact = strings.TrimSpace(req.Contact)
 	req.PreferredTime = strings.TrimSpace(req.PreferredTime)
+	req.Reason = strings.TrimSpace(req.Reason)
 	req.Description = strings.TrimSpace(req.Description)
 	for _, f := range []struct {
 		name, value string
@@ -156,6 +158,7 @@ func (s *Server) addBooking(w http.ResponseWriter, r *http.Request) {
 		{"name", req.Name, 100, true},
 		{"contact", req.Contact, 200, true},
 		{"preferredTime", req.PreferredTime, 200, true},
+		{"reason", req.Reason, 200, true},
 		{"description", req.Description, 2000, false},
 	} {
 		if f.required && f.value == "" {
@@ -171,6 +174,7 @@ func (s *Server) addBooking(w http.ResponseWriter, r *http.Request) {
 		Name:          req.Name,
 		Contact:       req.Contact,
 		PreferredTime: req.PreferredTime,
+		Reason:        req.Reason,
 		Description:   req.Description,
 	}
 	if u := userFrom(r.Context()); u != nil {
