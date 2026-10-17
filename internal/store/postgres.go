@@ -77,11 +77,11 @@ func (p *Postgres) migrate(ctx context.Context) error {
 func (p *Postgres) Ping(ctx context.Context) error { return p.pool.Ping(ctx) }
 func (p *Postgres) Close()                         { p.pool.Close() }
 
-const userCols = `uid, email, display_name, photo_url, language, created_at, last_seen_at`
+const userCols = `uid, email, display_name, photo_url, language, avatar, created_at, last_seen_at`
 
 func scanUser(row pgx.Row) (User, error) {
 	var u User
-	err := row.Scan(&u.UID, &u.Email, &u.DisplayName, &u.PhotoURL, &u.Language, &u.CreatedAt, &u.LastSeenAt)
+	err := row.Scan(&u.UID, &u.Email, &u.DisplayName, &u.PhotoURL, &u.Language, &u.Avatar, &u.CreatedAt, &u.LastSeenAt)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return u, ErrNotFound
 	}
@@ -106,13 +106,14 @@ func (p *Postgres) GetUser(ctx context.Context, uid string) (User, error) {
 	return scanUser(p.pool.QueryRow(ctx, `SELECT `+userCols+` FROM users WHERE uid = $1`, uid))
 }
 
-func (p *Postgres) UpdateUser(ctx context.Context, uid string, displayName, language *string) (User, error) {
+func (p *Postgres) UpdateUser(ctx context.Context, uid string, upd UserUpdate) (User, error) {
 	return scanUser(p.pool.QueryRow(ctx, `
 		UPDATE users SET
 			display_name = COALESCE($2, display_name),
-			language = COALESCE($3, language)
+			language = COALESCE($3, language),
+			avatar = CASE WHEN $4::text IS NULL THEN avatar ELSE NULLIF($4, '') END
 		WHERE uid = $1
-		RETURNING `+userCols, uid, displayName, language))
+		RETURNING `+userCols, uid, upd.DisplayName, upd.Language, upd.Avatar))
 }
 
 func (p *Postgres) AddGameSession(ctx context.Context, s GameSession) (GameSession, error) {

@@ -1,6 +1,7 @@
 package api
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"net"
@@ -46,6 +47,7 @@ func (s *Server) patchMe(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		DisplayName *string `json:"displayName"`
 		Language    *string `json:"language"`
+		Avatar      *string `json:"avatar"`
 	}
 	if !decodeJSON(w, r, &req) {
 		return
@@ -62,12 +64,46 @@ func (s *Server) patchMe(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, `language must be "en" or "ar"`)
 		return
 	}
-	u, err := s.store.UpdateUser(r.Context(), userFrom(r.Context()).UID, req.DisplayName, req.Language)
+	if req.Avatar != nil && *req.Avatar != "" {
+		if msg := checkAvatar(*req.Avatar); msg != "" {
+			writeError(w, http.StatusBadRequest, msg)
+			return
+		}
+	}
+	u, err := s.store.UpdateUser(r.Context(), userFrom(r.Context()).UID, store.UserUpdate{
+		DisplayName: req.DisplayName,
+		Language:    req.Language,
+		Avatar:      req.Avatar,
+	})
 	if err != nil {
 		s.serverError(w, "update user", err)
 		return
 	}
 	writeJSON(w, http.StatusOK, u)
+}
+
+const maxAvatarBytes = 200 << 10
+
+// checkAvatar accepts a JPEG, PNG or WebP data URL of at most 200 KB and
+// returns a reason when it isn't one.
+func checkAvatar(dataURL string) string {
+	if len(dataURL) > maxAvatarBytes {
+		return "avatar must be at most 200 KB"
+	}
+	var payload string
+	for _, prefix := range []string{"data:image/jpeg;base64,", "data:image/png;base64,", "data:image/webp;base64,"} {
+		if strings.HasPrefix(dataURL, prefix) {
+			payload = dataURL[len(prefix):]
+			break
+		}
+	}
+	if payload == "" {
+		return "avatar must be a JPEG, PNG or WebP data URL"
+	}
+	if _, err := base64.StdEncoding.DecodeString(payload); err != nil {
+		return "avatar is not valid base64"
+	}
+	return ""
 }
 
 // --- games ---

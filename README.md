@@ -30,7 +30,7 @@ All responses are JSON. Errors look like `{"error": "message"}`.
 | --- | --- | --- | --- |
 | GET | `/healthz` | none | `{"status":"ok"}`, or 503 if the database is down |
 | GET | `/v1/me` | user | Current user's profile (created on first call) |
-| PATCH | `/v1/me` | user | Update `displayName` and/or `language` (`"en"` or `"ar"`) |
+| PATCH | `/v1/me` | user | Update `displayName`, `language` (`"en"` or `"ar"`) and/or `avatar` (JPEG, PNG or WebP data URL up to 200 KB; `""` removes it). Profiles return `avatar` as the data URL or `null` |
 | POST | `/v1/games/sessions` | user | Record a finished round: `gameId`, `durationSeconds`, optional `score`, optional `details` object |
 | GET | `/v1/games/sessions?gameId=&limit=` | user | Recent rounds, newest first (limit 1–200, default 50) |
 | GET | `/v1/games/progress` | user | Per game: plays, total seconds, best score, last played |

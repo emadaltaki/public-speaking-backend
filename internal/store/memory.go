@@ -59,18 +59,26 @@ func (m *Memory) GetUser(_ context.Context, uid string) (User, error) {
 	return u, nil
 }
 
-func (m *Memory) UpdateUser(_ context.Context, uid string, displayName, language *string) (User, error) {
+func (m *Memory) UpdateUser(_ context.Context, uid string, upd UserUpdate) (User, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	u, ok := m.users[uid]
 	if !ok {
 		return User{}, ErrNotFound
 	}
-	if displayName != nil {
-		u.DisplayName = *displayName
+	if upd.DisplayName != nil {
+		u.DisplayName = *upd.DisplayName
 	}
-	if language != nil {
-		u.Language = *language
+	if upd.Language != nil {
+		u.Language = *upd.Language
+	}
+	if upd.Avatar != nil {
+		if *upd.Avatar == "" {
+			u.Avatar = nil
+		} else {
+			avatar := *upd.Avatar
+			u.Avatar = &avatar
+		}
 	}
 	m.users[uid] = u
 	return u, nil

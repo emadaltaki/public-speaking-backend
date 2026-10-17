@@ -34,8 +34,18 @@ func TestStoreContract(t *testing.T) {
 				t.Fatalf("create user: %v %+v", err, u)
 			}
 			name := "Chosen"
-			if _, err := st.UpdateUser(ctx, uid, &name, nil); err != nil {
+			if _, err := st.UpdateUser(ctx, uid, UserUpdate{DisplayName: &name}); err != nil {
 				t.Fatal(err)
+			}
+			pic, none := "data:image/jpeg;base64,AAAA", ""
+			if u, err := st.UpdateUser(ctx, uid, UserUpdate{Avatar: &pic}); err != nil || u.Avatar == nil || *u.Avatar != pic || u.DisplayName != "Chosen" {
+				t.Fatalf("set avatar: %v %+v", err, u)
+			}
+			if u, _ := st.UpdateUser(ctx, uid, UserUpdate{}); u.Avatar == nil {
+				t.Fatalf("empty update cleared the avatar")
+			}
+			if u, _ := st.UpdateUser(ctx, uid, UserUpdate{Avatar: &none}); u.Avatar != nil {
+				t.Fatalf("clear avatar: %+v", u)
 			}
 			u, _ = st.UpsertUser(ctx, User{UID: uid, Email: "b@example.com", DisplayName: "From Google"})
 			if u.DisplayName != "Chosen" || u.Email != "b@example.com" {

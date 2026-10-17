@@ -16,8 +16,17 @@ type User struct {
 	DisplayName string    `json:"displayName"`
 	PhotoURL    string    `json:"photoUrl"`
 	Language    string    `json:"language"` // "en" or "ar"
+	Avatar      *string   `json:"avatar"`   // profile picture as a data URL, null when unset
 	CreatedAt   time.Time `json:"createdAt"`
 	LastSeenAt  time.Time `json:"lastSeenAt"`
+}
+
+// UserUpdate holds profile changes; nil fields are left as they are. An empty
+// Avatar clears the picture.
+type UserUpdate struct {
+	DisplayName *string
+	Language    *string
+	Avatar      *string
 }
 
 // GameSession is one finished round of a practice game.
@@ -58,7 +67,7 @@ type Booking struct {
 type Store interface {
 	UpsertUser(ctx context.Context, u User) (User, error)
 	GetUser(ctx context.Context, uid string) (User, error)
-	UpdateUser(ctx context.Context, uid string, displayName, language *string) (User, error)
+	UpdateUser(ctx context.Context, uid string, upd UserUpdate) (User, error)
 
 	AddGameSession(ctx context.Context, s GameSession) (GameSession, error)
 	ListGameSessions(ctx context.Context, uid, gameID string, limit int) ([]GameSession, error)

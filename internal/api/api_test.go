@@ -3,6 +3,7 @@ package api
 import (
 	"bytes"
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"io"
 	"log/slog"
@@ -102,6 +103,31 @@ func TestMe(t *testing.T) {
 	}
 	if rec, _ := do(t, h, "PATCH", "/v1/me", "alice", map[string]any{"language": "fr"}); rec.Code != 400 {
 		t.Fatalf("bad language: got %d", rec.Code)
+	}
+
+	if body["avatar"] != nil {
+		t.Fatalf("new user should have no avatar: %v", body)
+	}
+	pic := "data:image/jpeg;base64," + base64.StdEncoding.EncodeToString(bytes.Repeat([]byte{0xff}, 30<<10))
+	rec, body = do(t, h, "PATCH", "/v1/me", "alice", map[string]any{"avatar": pic})
+	if rec.Code != 200 || body["avatar"] != pic || body["displayName"] != "Al" {
+		t.Fatalf("set avatar: %d", rec.Code)
+	}
+	if _, body = do(t, h, "GET", "/v1/me", "alice", nil); body["avatar"] != pic {
+		t.Fatalf("avatar not returned by GET")
+	}
+	for name, bad := range map[string]string{
+		"gif":       "data:image/gif;base64,AAAA",
+		"not data":  "https://example.com/me.jpg",
+		"bad b64":   "data:image/png;base64,***",
+		"too large": "data:image/jpeg;base64," + base64.StdEncoding.EncodeToString(make([]byte, 160<<10)),
+	} {
+		if rec, _ := do(t, h, "PATCH", "/v1/me", "alice", map[string]any{"avatar": bad}); rec.Code != 400 {
+			t.Fatalf("%s avatar: got %d", name, rec.Code)
+		}
+	}
+	if rec, body = do(t, h, "PATCH", "/v1/me", "alice", map[string]any{"avatar": ""}); rec.Code != 200 || body["avatar"] != nil {
+		t.Fatalf("clear avatar: %d %v", rec.Code, body["avatar"])
 	}
 }
 

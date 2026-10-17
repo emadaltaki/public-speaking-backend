@@ -66,7 +66,7 @@ func (s *Server) Handler() http.Handler {
 	mux.Handle("GET /v1/admin/bookings", s.requireAdmin(s.adminListBookings))
 	mux.Handle("PATCH /v1/admin/bookings/{id}", s.requireAdmin(s.adminSetBookingStatus))
 
-	return s.recoverer(s.logRequests(s.cors(limitBody(mux, 64<<10))))
+	return s.recoverer(s.logRequests(s.cors(limitBody(mux, 300<<10))))
 }
 
 type ctxKey struct{}
