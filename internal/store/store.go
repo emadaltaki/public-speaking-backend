@@ -11,14 +11,15 @@ import (
 var ErrNotFound = errors.New("not found")
 
 type User struct {
-	UID         string    `json:"uid"`
-	Email       string    `json:"email"`
-	DisplayName string    `json:"displayName"`
-	PhotoURL    string    `json:"photoUrl"`
-	Language    string    `json:"language"` // "en" or "ar"
-	Avatar      *string   `json:"avatar"`   // profile picture as a data URL, null when unset
-	CreatedAt   time.Time `json:"createdAt"`
-	LastSeenAt  time.Time `json:"lastSeenAt"`
+	UID           string    `json:"uid"`
+	Email         string    `json:"email"`
+	DisplayName   string    `json:"displayName"`
+	PhotoURL      string    `json:"photoUrl"`
+	Language      string    `json:"language"` // "en" or "ar"
+	Avatar        *string   `json:"avatar"`   // profile picture as a data URL, null when unset
+	EmailVerified bool      `json:"emailVerified"`
+	CreatedAt     time.Time `json:"createdAt"`
+	LastSeenAt    time.Time `json:"lastSeenAt"`
 }
 
 // UserUpdate holds profile changes; nil fields are left as they are. An empty
@@ -27,6 +28,16 @@ type UserUpdate struct {
 	DisplayName *string
 	Language    *string
 	Avatar      *string
+}
+
+// EmailCode is the pending verification code for one user. Only a hash of the
+// code is stored.
+type EmailCode struct {
+	UID       string
+	Email     string
+	CodeHash  string
+	ExpiresAt time.Time
+	Attempts  int
 }
 
 // GameSession is one finished round of a practice game.
@@ -77,6 +88,16 @@ type Store interface {
 	ListBookingsForUser(ctx context.Context, uid string) ([]Booking, error)
 	ListBookings(ctx context.Context, limit int) ([]Booking, error)
 	SetBookingStatus(ctx context.Context, id int64, status string) (Booking, error)
+
+	SetEmailVerified(ctx context.Context, uid string) error
+	// PutEmailCode replaces the user's pending code and records the send.
+	PutEmailCode(ctx context.Context, c EmailCode) error
+	GetEmailCode(ctx context.Context, uid string) (EmailCode, error)
+	// AddCodeAttempt counts a wrong guess and returns the attempts so far.
+	AddCodeAttempt(ctx context.Context, uid string) (int, error)
+	DeleteEmailCode(ctx context.Context, uid string) error
+	// CodeSendsSince returns when codes were sent to the user since t, newest first.
+	CodeSendsSince(ctx context.Context, uid string, t time.Time) ([]time.Time, error)
 
 	Ping(ctx context.Context) error
 	Close()

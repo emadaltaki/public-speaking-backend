@@ -13,12 +13,14 @@ type Memory struct {
 	mu       sync.Mutex
 	users    map[string]User
 	sessions []GameSession
+	codes    map[string]EmailCode
+	sends    map[string][]time.Time
 	bookings []Booking
 	nextID   int64
 }
 
 func NewMemory() *Memory {
-	return &Memory{users: map[string]User{}}
+	return &Memory{users: map[string]User{}, codes: map[string]EmailCode{}, sends: map[string][]time.Time{}}
 }
 
 func (m *Memory) id() int64 { m.nextID++; return m.nextID }
@@ -36,6 +38,9 @@ func (m *Memory) UpsertUser(_ context.Context, u User) (User, error) {
 		u.CreatedAt, u.LastSeenAt = now, now
 		m.users[u.UID] = u
 		return u, nil
+	}
+	if existing.Email != u.Email {
+		existing.EmailVerified = false
 	}
 	existing.Email = u.Email
 	if u.PhotoURL != "" {
@@ -179,4 +184,76 @@ func (m *Memory) SetBookingStatus(_ context.Context, id int64, status string) (B
 		}
 	}
 	return Booking{}, ErrNotFound
+}
+
+func (m *Memory) SetEmailVerified(_ context.Context, uid string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	u, ok := m.users[uid]
+	if !ok {
+		return ErrNotFound
+	}
+	u.EmailVerified = true
+	m.users[uid] = u
+	return nil
+}
+
+func (m *Memory) PutEmailCode(_ context.Context, c EmailCode) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	c.Attempts = 0
+	m.codes[c.UID] = c
+	m.sends[c.UID] = append(m.sends[c.UID], time.Now())
+	return nil
+}
+
+func (m *Memory) GetEmailCode(_ context.Context, uid string) (EmailCode, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	c, ok := m.codes[uid]
+	if !ok {
+		return EmailCode{}, ErrNotFound
+	}
+	return c, nil
+}
+
+func (m *Memory) AddCodeAttempt(_ context.Context, uid string) (int, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	c, ok := m.codes[uid]
+	if !ok {
+		return 0, ErrNotFound
+	}
+	c.Attempts++
+	m.codes[uid] = c
+	return c.Attempts, nil
+}
+
+func (m *Memory) DeleteEmailCode(_ context.Context, uid string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	delete(m.codes, uid)
+	return nil
+}
+
+func (m *Memory) CodeSendsSince(_ context.Context, uid string, t time.Time) ([]time.Time, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	var out []time.Time
+	for i := len(m.sends[uid]) - 1; i >= 0; i-- {
+		if at := m.sends[uid][i]; at.After(t) {
+			out = append(out, at)
+		}
+	}
+	return out, nil
+}
+
+// ShiftSends moves a user's recorded code sends by d. Tests use it to
+// simulate sends that happened earlier.
+func (m *Memory) ShiftSends(uid string, d time.Duration) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	for i := range m.sends[uid] {
+		m.sends[uid][i] = m.sends[uid][i].Add(d)
+	}
 }

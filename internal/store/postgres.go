@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io/fs"
 	"sort"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -77,11 +78,11 @@ func (p *Postgres) migrate(ctx context.Context) error {
 func (p *Postgres) Ping(ctx context.Context) error { return p.pool.Ping(ctx) }
 func (p *Postgres) Close()                         { p.pool.Close() }
 
-const userCols = `uid, email, display_name, photo_url, language, avatar, created_at, last_seen_at`
+const userCols = `uid, email, display_name, photo_url, language, avatar, email_verified, created_at, last_seen_at`
 
 func scanUser(row pgx.Row) (User, error) {
 	var u User
-	err := row.Scan(&u.UID, &u.Email, &u.DisplayName, &u.PhotoURL, &u.Language, &u.Avatar, &u.CreatedAt, &u.LastSeenAt)
+	err := row.Scan(&u.UID, &u.Email, &u.DisplayName, &u.PhotoURL, &u.Language, &u.Avatar, &u.EmailVerified, &u.CreatedAt, &u.LastSeenAt)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return u, ErrNotFound
 	}
@@ -95,6 +96,7 @@ func (p *Postgres) UpsertUser(ctx context.Context, u User) (User, error) {
 		INSERT INTO users (uid, email, display_name, photo_url)
 		VALUES ($1, $2, $3, $4)
 		ON CONFLICT (uid) DO UPDATE SET
+			email_verified = users.email_verified AND users.email = EXCLUDED.email,
 			email = EXCLUDED.email,
 			photo_url = CASE WHEN EXCLUDED.photo_url <> '' THEN EXCLUDED.photo_url ELSE users.photo_url END,
 			display_name = CASE WHEN users.display_name = '' THEN EXCLUDED.display_name ELSE users.display_name END,
@@ -222,4 +224,69 @@ func (p *Postgres) ListBookings(ctx context.Context, limit int) ([]Booking, erro
 func (p *Postgres) SetBookingStatus(ctx context.Context, id int64, status string) (Booking, error) {
 	return scanBooking(p.pool.QueryRow(ctx,
 		`UPDATE bookings SET status = $2 WHERE id = $1 RETURNING `+bookingCols, id, status))
+}
+
+func (p *Postgres) SetEmailVerified(ctx context.Context, uid string) error {
+	_, err := p.pool.Exec(ctx, `UPDATE users SET email_verified = true WHERE uid = $1`, uid)
+	return err
+}
+
+func (p *Postgres) PutEmailCode(ctx context.Context, c EmailCode) error {
+	return pgx.BeginFunc(ctx, p.pool, func(tx pgx.Tx) error {
+		if _, err := tx.Exec(ctx, `
+			INSERT INTO email_codes (uid, email, code_hash, expires_at, attempts)
+			VALUES ($1, $2, $3, $4, 0)
+			ON CONFLICT (uid) DO UPDATE SET
+				email = EXCLUDED.email, code_hash = EXCLUDED.code_hash,
+				expires_at = EXCLUDED.expires_at, attempts = 0, created_at = now()`,
+			c.UID, c.Email, c.CodeHash, c.ExpiresAt); err != nil {
+			return err
+		}
+		_, err := tx.Exec(ctx, `INSERT INTO email_code_sends (uid) VALUES ($1)`, c.UID)
+		return err
+	})
+}
+
+func (p *Postgres) GetEmailCode(ctx context.Context, uid string) (EmailCode, error) {
+	var c EmailCode
+	err := p.pool.QueryRow(ctx, `
+		SELECT uid, email, code_hash, expires_at, attempts FROM email_codes WHERE uid = $1`, uid).
+		Scan(&c.UID, &c.Email, &c.CodeHash, &c.ExpiresAt, &c.Attempts)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return c, ErrNotFound
+	}
+	return c, err
+}
+
+func (p *Postgres) AddCodeAttempt(ctx context.Context, uid string) (int, error) {
+	var n int
+	err := p.pool.QueryRow(ctx,
+		`UPDATE email_codes SET attempts = attempts + 1 WHERE uid = $1 RETURNING attempts`, uid).Scan(&n)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return 0, ErrNotFound
+	}
+	return n, err
+}
+
+func (p *Postgres) DeleteEmailCode(ctx context.Context, uid string) error {
+	_, err := p.pool.Exec(ctx, `DELETE FROM email_codes WHERE uid = $1`, uid)
+	return err
+}
+
+func (p *Postgres) CodeSendsSince(ctx context.Context, uid string, t time.Time) ([]time.Time, error) {
+	rows, err := p.pool.Query(ctx, `
+		SELECT sent_at FROM email_code_sends WHERE uid = $1 AND sent_at > $2 ORDER BY sent_at DESC`, uid, t)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []time.Time
+	for rows.Next() {
+		var at time.Time
+		if err := rows.Scan(&at); err != nil {
+			return nil, err
+		}
+		out = append(out, at)
+	}
+	return out, rows.Err()
 }

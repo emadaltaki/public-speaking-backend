@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/emadaltaki/public-speaking-backend/internal/auth"
+	"github.com/emadaltaki/public-speaking-backend/internal/mail"
 	"github.com/emadaltaki/public-speaking-backend/internal/store"
 )
 
@@ -23,6 +24,8 @@ type Config struct {
 	// AdminEmails may list and update all booking requests. Their Firebase
 	// email must be verified.
 	AdminEmails []string
+	// Mailer sends verification codes. Nil when SMTP isn't configured.
+	Mailer mail.Sender
 }
 
 type Server struct {
@@ -54,6 +57,8 @@ func (s *Server) Handler() http.Handler {
 
 	mux.Handle("GET /v1/me", s.requireUser(s.getMe))
 	mux.Handle("PATCH /v1/me", s.requireUser(s.patchMe))
+	mux.Handle("POST /v1/me/verify/send", s.requireUser(s.sendVerifyCode))
+	mux.Handle("POST /v1/me/verify/check", s.requireUser(s.checkVerifyCode))
 
 	mux.Handle("POST /v1/games/sessions", s.requireUser(s.addGameSession))
 	mux.Handle("GET /v1/games/sessions", s.requireUser(s.listGameSessions))
@@ -96,6 +101,13 @@ func (s *Server) authenticate(r *http.Request) (*store.User, *auth.User, error) 
 	})
 	if err != nil {
 		return nil, nil, err
+	}
+	// Firebase already verified this email (e.g. Google sign-in): record it.
+	if claims.EmailVerified && claims.Email != "" && !u.EmailVerified {
+		if err := s.store.SetEmailVerified(r.Context(), u.UID); err != nil {
+			return nil, nil, err
+		}
+		u.EmailVerified = true
 	}
 	return &u, claims, nil
 }

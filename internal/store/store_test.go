@@ -93,6 +93,43 @@ func TestStoreContract(t *testing.T) {
 			if _, err := st.SetBookingStatus(ctx, -1, "closed"); err != ErrNotFound {
 				t.Fatalf("missing booking: %v", err)
 			}
+
+			// Email verification codes.
+			if u, _ := st.GetUser(ctx, uid); u.EmailVerified {
+				t.Fatalf("new user should be unverified")
+			}
+			exp := time.Now().Add(10 * time.Minute)
+			if err := st.PutEmailCode(ctx, EmailCode{UID: uid, Email: "b@example.com", CodeHash: "h1", ExpiresAt: exp}); err != nil {
+				t.Fatal(err)
+			}
+			if n, err := st.AddCodeAttempt(ctx, uid); err != nil || n != 1 {
+				t.Fatalf("attempt: %v %d", err, n)
+			}
+			if err := st.PutEmailCode(ctx, EmailCode{UID: uid, Email: "b@example.com", CodeHash: "h2", ExpiresAt: exp}); err != nil {
+				t.Fatal(err)
+			}
+			c, err := st.GetEmailCode(ctx, uid)
+			if err != nil || c.CodeHash != "h2" || c.Attempts != 0 || c.ExpiresAt.Unix() != exp.Unix() {
+				t.Fatalf("replaced code: %v %+v", err, c)
+			}
+			if sends, err := st.CodeSendsSince(ctx, uid, time.Now().Add(-time.Hour)); err != nil || len(sends) != 2 {
+				t.Fatalf("sends: %v %d", err, len(sends))
+			}
+			if err := st.DeleteEmailCode(ctx, uid); err != nil {
+				t.Fatal(err)
+			}
+			if _, err := st.GetEmailCode(ctx, uid); err != ErrNotFound {
+				t.Fatalf("deleted code: %v", err)
+			}
+			if err := st.SetEmailVerified(ctx, uid); err != nil {
+				t.Fatal(err)
+			}
+			if u, _ := st.UpsertUser(ctx, User{UID: uid, Email: "b@example.com"}); !u.EmailVerified {
+				t.Fatalf("verified flag lost on sign-in")
+			}
+			if u, _ := st.UpsertUser(ctx, User{UID: uid, Email: "new@example.com"}); u.EmailVerified {
+				t.Fatalf("changing email should clear verification")
+			}
 		})
 	}
 }

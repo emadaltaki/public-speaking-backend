@@ -14,6 +14,7 @@ import (
 
 	"github.com/emadaltaki/public-speaking-backend/internal/api"
 	"github.com/emadaltaki/public-speaking-backend/internal/auth"
+	"github.com/emadaltaki/public-speaking-backend/internal/mail"
 	"github.com/emadaltaki/public-speaking-backend/internal/store"
 )
 
@@ -46,10 +47,25 @@ func run(log *slog.Logger) error {
 	}
 	defer st.Close()
 
+	var mailer mail.Sender
+	smtpCfg := mail.SMTP{
+		Host: os.Getenv("SMTP_HOST"),
+		Port: env("SMTP_PORT", "587"),
+		User: os.Getenv("SMTP_USER"),
+		Pass: os.Getenv("SMTP_PASS"),
+		From: os.Getenv("MAIL_FROM"),
+	}
+	if smtpCfg.Host != "" && smtpCfg.User != "" && smtpCfg.Pass != "" && smtpCfg.From != "" {
+		mailer = smtpCfg
+	} else {
+		log.Warn("SMTP_HOST, SMTP_USER, SMTP_PASS or MAIL_FROM not set: verification emails are off")
+	}
+
 	srv := api.NewServer(api.Config{
 		AllowedOrigins: list(env("ALLOWED_ORIGINS", "https://public-speaking-lemon.vercel.app")),
 		AllowLocalhost: env("ALLOW_LOCALHOST", "true") == "true",
 		AdminEmails:    list(os.Getenv("ADMIN_EMAILS")),
+		Mailer:         mailer,
 	}, st, auth.NewFirebaseVerifier(projectID), log)
 
 	httpServer := &http.Server{
