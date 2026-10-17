@@ -96,6 +96,20 @@ go test ./...
 The store tests also run against Postgres when `TEST_DATABASE_URL` points at a
 throwaway database (a Neon branch works well).
 
+## Deploy to Vercel
+
+Vercel runs this repo as a Go server with no extra config. In the Vercel
+project, open Settings > Environment Variables and set:
+
+- `DATABASE_URL`: the Neon connection string (required; without it every
+  serverless instance keeps its own throwaway in-memory data)
+- `ADMIN_EMAILS`: emails that can manage bookings
+- `ALLOW_LOCALHOST`: `false` for Production
+
+Redeploy after changing variables, then open `/healthz`. It should say
+`"database": "postgres"`. A request log line for `/favicon.ico` is just the
+browser asking for an icon and can be ignored.
+
 ## Deploy to Cloud Run
 
 One-time setup, done by the project owner:

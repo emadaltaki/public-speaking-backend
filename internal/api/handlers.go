@@ -21,7 +21,19 @@ func (s *Server) health(w http.ResponseWriter, r *http.Request) {
 		s.log.Error("health: database ping", "err", err)
 		status, code = "database unavailable", http.StatusServiceUnavailable
 	}
-	writeJSON(w, code, map[string]string{"status": status})
+	database := "postgres"
+	if _, ok := s.store.(*store.Memory); ok {
+		database = "memory (data is lost on restart: set DATABASE_URL)"
+	}
+	writeJSON(w, code, map[string]string{"status": status, "database": database})
+}
+
+// root answers visits to the bare API URL so a browser shows something useful.
+func (s *Server) root(w http.ResponseWriter, r *http.Request) {
+	writeJSON(w, http.StatusOK, map[string]string{
+		"service": "Speak Up Fearless API",
+		"health":  "/healthz",
+	})
 }
 
 // --- users ---

@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strconv"
+	"strings"
 	"testing"
 
 	"github.com/emadaltaki/public-speaking-backend/internal/auth"
@@ -59,6 +60,18 @@ func TestHealth(t *testing.T) {
 	rec, body := do(t, newTestServer(t), "GET", "/healthz", "", nil)
 	if rec.Code != 200 || body["status"] != "ok" {
 		t.Fatalf("got %d %v", rec.Code, body)
+	}
+	if db, _ := body["database"].(string); !strings.HasPrefix(db, "memory") {
+		t.Fatalf("health should report the in-memory store, got %v", body)
+	}
+	if rec, _ := do(t, newTestServer(t), "GET", "/", "", nil); rec.Code != 200 {
+		t.Fatalf("root: got %d", rec.Code)
+	}
+	if rec, _ := do(t, newTestServer(t), "GET", "/favicon.ico", "", nil); rec.Code != 204 {
+		t.Fatalf("favicon: got %d", rec.Code)
+	}
+	if rec, _ := do(t, newTestServer(t), "GET", "/nope", "", nil); rec.Code != 404 {
+		t.Fatalf("unknown path: got %d", rec.Code)
 	}
 }
 

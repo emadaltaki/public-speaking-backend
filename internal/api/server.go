@@ -46,7 +46,11 @@ func NewServer(cfg Config, st store.Store, v auth.Verifier, log *slog.Logger) *S
 func (s *Server) Handler() http.Handler {
 	mux := http.NewServeMux()
 
+	mux.HandleFunc("GET /{$}", s.root)
 	mux.HandleFunc("GET /healthz", s.health)
+	mux.HandleFunc("GET /favicon.ico", func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusNoContent) // browsers ask for this when the API URL is opened
+	})
 
 	mux.Handle("GET /v1/me", s.requireUser(s.getMe))
 	mux.Handle("PATCH /v1/me", s.requireUser(s.patchMe))
@@ -202,7 +206,7 @@ func (s *Server) logRequests(next http.Handler) http.Handler {
 		start := time.Now()
 		rec := &statusRecorder{ResponseWriter: w, status: http.StatusOK}
 		next.ServeHTTP(rec, r)
-		if r.URL.Path == "/healthz" {
+		if r.URL.Path == "/healthz" || r.URL.Path == "/favicon.ico" {
 			return
 		}
 		s.log.Info("request", "method", r.Method, "path", r.URL.Path,
