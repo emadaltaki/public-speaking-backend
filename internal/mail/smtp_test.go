@@ -7,7 +7,7 @@ import (
 )
 
 func TestBuildMessageEncodesUTF8(t *testing.T) {
-	msg := string(buildMessage("Speak Up <a@example.com>", "b@example.com", "رمزك: 123456", "مرحبًا 123456"))
+	msg := string(buildMessage("Speak Up <a@example.com>", Message{To: "b@example.com", Subject: "رمزك: 123456", Text: "مرحبًا 123456"}))
 	head, body, ok := strings.Cut(msg, "\r\n\r\n")
 	if !ok {
 		t.Fatal("no header/body separator")

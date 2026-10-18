@@ -12,10 +12,11 @@ import (
 	"time"
 
 	"github.com/emadaltaki/public-speaking-backend/internal/auth"
+	"github.com/emadaltaki/public-speaking-backend/internal/mail"
 	"github.com/emadaltaki/public-speaking-backend/internal/store"
 )
 
-type sentMail struct{ to, subject, body string }
+type sentMail struct{ to, subject, body, html string }
 
 type fakeMailer struct {
 	mu   sync.Mutex
@@ -23,13 +24,13 @@ type fakeMailer struct {
 	fail bool
 }
 
-func (m *fakeMailer) Send(_ context.Context, to, subject, body string) error {
+func (m *fakeMailer) Send(_ context.Context, msg mail.Message) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	if m.fail {
 		return io.ErrUnexpectedEOF
 	}
-	m.sent = append(m.sent, sentMail{to, subject, body})
+	m.sent = append(m.sent, sentMail{msg.To, msg.Subject, msg.Text, msg.HTML})
 	return nil
 }
 
@@ -216,3 +217,34 @@ func TestVerifyMailFailure(t *testing.T) {
 }
 
 var _ auth.Verifier = fakeVerifier{}
+
+func TestVerifyLinkOneTap(t *testing.T) {
+	m := &fakeMailer{}
+	h, _ := newVerifyServer(t, m)
+	do(t, h, "POST", "/v1/me/verify/send", "pw", nil)
+	code := m.lastCode(t)
+	link := regexp.MustCompile(`href="([^"]+)"`).FindStringSubmatch(m.sent[0].html)
+	if link == nil || !strings.Contains(link[1], "/v1/verify/link?u=pw&amp;c="+code) {
+		t.Fatalf("email has no verify button link: %v", link)
+	}
+
+	// A wrong code in the link doesn't verify.
+	rec, _ := do(t, h, "GET", "/v1/verify/link?u=pw&c=999999", "", nil)
+	if code == "999999" {
+		rec, _ = do(t, h, "GET", "/v1/verify/link?u=pw&c=888888", "", nil)
+	}
+	if rec.Code != 303 || !strings.HasSuffix(rec.Header().Get("Location"), "/login?verify=wrong") {
+		t.Fatalf("wrong link: %d %s", rec.Code, rec.Header().Get("Location"))
+	}
+	// The real link verifies without signing in, then sends people to the site.
+	rec, _ = do(t, h, "GET", "/v1/verify/link?u=pw&c="+code, "", nil)
+	if rec.Code != 303 || !strings.HasSuffix(rec.Header().Get("Location"), "/login?verify=verified") {
+		t.Fatalf("good link: %d %s", rec.Code, rec.Header().Get("Location"))
+	}
+	if _, body := do(t, h, "GET", "/v1/me", "pw", nil); body["emailVerified"] != true {
+		t.Fatalf("not verified after link: %v", body)
+	}
+	if rec, _ := do(t, h, "GET", "/v1/verify/link?u=nobody&c=123456", "", nil); !strings.HasSuffix(rec.Header().Get("Location"), "verify=expired") {
+		t.Fatalf("unknown user link: %s", rec.Header().Get("Location"))
+	}
+}

@@ -71,10 +71,15 @@ func run(log *slog.Logger) error {
 			smtpCfg.From = (&netmail.Address{Name: strings.TrimSpace(smtpCfg.From[:i]), Address: smtpCfg.From[i+1:]}).String()
 		}
 	}
-	if smtpCfg.Host != "" && smtpCfg.User != "" && smtpCfg.Pass != "" && smtpCfg.From != "" {
+	switch {
+	case os.Getenv("BREVO_API_KEY") != "" && smtpCfg.From != "":
+		mailer = mail.Brevo{APIKey: os.Getenv("BREVO_API_KEY"), From: smtpCfg.From}
+		log.Info("verification emails go through Brevo")
+	case smtpCfg.Host != "" && smtpCfg.User != "" && smtpCfg.Pass != "" && smtpCfg.From != "":
 		mailer = smtpCfg
-	} else {
-		log.Warn("SMTP_HOST, SMTP_USER, SMTP_PASS or MAIL_FROM not set: verification emails are off")
+		log.Info("verification emails go through SMTP", "host", smtpCfg.Host)
+	default:
+		log.Warn("no BREVO_API_KEY or SMTP settings (with MAIL_FROM): verification emails are off")
 	}
 
 	srv := api.NewServer(api.Config{
@@ -82,6 +87,8 @@ func run(log *slog.Logger) error {
 		AllowLocalhost: env("ALLOW_LOCALHOST", "true") == "true",
 		AdminEmails:    list(os.Getenv("ADMIN_EMAILS")),
 		Mailer:         mailer,
+		SiteURL:        strings.TrimRight(env("SITE_URL", "https://public-speaking-lemon.vercel.app"), "/"),
+		PublicURL:      strings.TrimRight(env("PUBLIC_URL", "https://public-speaking-backend.vercel.app"), "/"),
 	}, st, auth.NewFirebaseVerifier(projectID), log)
 
 	httpServer := &http.Server{

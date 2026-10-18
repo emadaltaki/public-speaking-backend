@@ -8,11 +8,14 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"html"
 	"math/big"
 	"net/http"
+	"net/url"
 	"regexp"
 	"time"
 
+	"github.com/emadaltaki/public-speaking-backend/internal/mail"
 	"github.com/emadaltaki/public-speaking-backend/internal/store"
 )
 
@@ -86,10 +89,11 @@ func (s *Server) sendVerifyCode(w http.ResponseWriter, r *http.Request) {
 		s.serverError(w, "put email code", err)
 		return
 	}
-	subject, body := codeEmail(code, u.Language)
+	msg := codeEmail(code, s.verifyURL(u.UID, code), u.Language)
+	msg.To = u.Email
 	ctx, cancel := context.WithTimeout(r.Context(), 15*time.Second)
 	defer cancel()
-	if err := s.cfg.Mailer.Send(ctx, u.Email, subject, body); err != nil {
+	if err := s.cfg.Mailer.Send(ctx, msg); err != nil {
 		s.log.Error("send code email", "err", err)
 		writeError(w, http.StatusBadGateway, "could not send email")
 		return
@@ -114,65 +118,123 @@ func tooMany(w http.ResponseWriter, wait time.Duration) {
 	})
 }
 
+// verifyCode checks code against the user's pending code and marks the
+// email verified on a match. result is "verified", "expired" or "wrong".
+func (s *Server) verifyCode(ctx context.Context, u store.User, code string) (result string, attemptsLeft int, err error) {
+	if u.EmailVerified {
+		return "verified", 0, nil
+	}
+	c, err := s.store.GetEmailCode(ctx, u.UID)
+	if errors.Is(err, store.ErrNotFound) {
+		return "expired", 0, nil
+	}
+	if err != nil {
+		return "", 0, err
+	}
+	if time.Now().After(c.ExpiresAt) || c.Attempts >= maxCodeAttempts || c.Email != u.Email {
+		return "expired", 0, nil
+	}
+	got := hashCode(code, u.UID)
+	if !codeRe.MatchString(code) || subtle.ConstantTimeCompare([]byte(got), []byte(c.CodeHash)) != 1 {
+		attempts, err := s.store.AddCodeAttempt(ctx, u.UID)
+		if err != nil {
+			return "", 0, err
+		}
+		return "wrong", max(0, maxCodeAttempts-attempts), nil
+	}
+	if err := s.store.SetEmailVerified(ctx, u.UID); err != nil {
+		return "", 0, err
+	}
+	if err := s.store.DeleteEmailCode(ctx, u.UID); err != nil {
+		s.log.Error("delete email code", "err", err)
+	}
+	return "verified", 0, nil
+}
+
 func (s *Server) checkVerifyCode(w http.ResponseWriter, r *http.Request) {
-	u := userFrom(r.Context())
 	var req struct {
 		Code string `json:"code"`
 	}
 	if !decodeJSON(w, r, &req) {
 		return
 	}
-	if u.EmailVerified {
+	result, left, err := s.verifyCode(r.Context(), *userFrom(r.Context()), req.Code)
+	switch {
+	case err != nil:
+		s.serverError(w, "verify code", err)
+	case result == "verified":
 		writeJSON(w, http.StatusOK, map[string]bool{"verified": true})
-		return
+	case result == "wrong":
+		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "wrong", "attemptsLeft": left})
+	default:
+		writeError(w, http.StatusBadRequest, result)
 	}
-	c, err := s.store.GetEmailCode(r.Context(), u.UID)
-	if errors.Is(err, store.ErrNotFound) {
-		writeError(w, http.StatusBadRequest, "expired")
-		return
-	}
-	if err != nil {
-		s.serverError(w, "get email code", err)
-		return
-	}
-	if time.Now().After(c.ExpiresAt) || c.Attempts >= maxCodeAttempts || c.Email != u.Email {
-		writeError(w, http.StatusBadRequest, "expired")
-		return
-	}
-	got := hashCode(req.Code, u.UID)
-	if !codeRe.MatchString(req.Code) || subtle.ConstantTimeCompare([]byte(got), []byte(c.CodeHash)) != 1 {
-		attempts, err := s.store.AddCodeAttempt(r.Context(), u.UID)
-		if err != nil {
-			s.serverError(w, "add code attempt", err)
-			return
-		}
-		writeJSON(w, http.StatusBadRequest, map[string]any{
-			"error":        "wrong",
-			"attemptsLeft": max(0, maxCodeAttempts-attempts),
-		})
-		return
-	}
-	if err := s.store.SetEmailVerified(r.Context(), u.UID); err != nil {
-		s.serverError(w, "set email verified", err)
-		return
-	}
-	if err := s.store.DeleteEmailCode(r.Context(), u.UID); err != nil {
-		s.log.Error("delete email code", "err", err)
-	}
-	writeJSON(w, http.StatusOK, map[string]bool{"verified": true})
 }
 
-func codeEmail(code, language string) (subject, body string) {
-	if language == "ar" {
-		return "رمز Speak Up Fearless الخاص بك: " + code,
-			"مرحبًا،\n\n" +
-				"رمز التحقق الخاص بك هو: " + code + "\n\n" +
-				"تنتهي صلاحية الرمز خلال 10 دقائق. إذا لم تقم بالتسجيل، يمكنك تجاهل هذه الرسالة.\n\n" +
-				"Speak Up Fearless"
+// verifyLink handles the "Verify my email" button in the code email. It needs
+// no sign-in, so it works on whichever device opens the email: the code in
+// the link is the proof, with the same expiry and attempt limits. It then
+// sends the visitor back to the site.
+func (s *Server) verifyLink(w http.ResponseWriter, r *http.Request) {
+	q := r.URL.Query()
+	uid, code := q.Get("u"), q.Get("c")
+	result := "expired"
+	if uid != "" && len(uid) <= 128 {
+		u, err := s.store.GetUser(r.Context(), uid)
+		switch {
+		case errors.Is(err, store.ErrNotFound):
+		case err != nil:
+			s.log.Error("verify link: get user", "err", err)
+			result = "error"
+		default:
+			if result, _, err = s.verifyCode(r.Context(), u, code); err != nil {
+				s.log.Error("verify link", "err", err)
+				result = "error"
+			}
+		}
 	}
-	return "Your Speak Up Fearless code: " + code,
-		"Hi there,\n\n" +
-			"Your verification code is: " + code + "\n\n" +
-			"It expires in 10 minutes. If you didn't sign up, you can ignore this email.\n\n" +
-			"Speak Up Fearless"
+	http.Redirect(w, r, s.cfg.SiteURL+"/login?verify="+result, http.StatusSeeOther)
+}
+
+func (s *Server) verifyURL(uid, code string) string {
+	return s.cfg.PublicURL + "/v1/verify/link?u=" + url.QueryEscape(uid) + "&c=" + code
+}
+
+func codeEmail(code, link, language string) mail.Message {
+	t := struct{ subject, hi, intro, button, or, expires, sign string }{
+		"Your Speak Up Fearless code: " + code,
+		"Hi there,",
+		"Tap the button to verify your email, or enter this code on the site:",
+		"Verify my email",
+		"Your code",
+		"It expires in 10 minutes. If you didn't sign up, you can ignore this email.",
+		"Speak Up Fearless",
+	}
+	dir := "ltr"
+	if language == "ar" {
+		t = struct{ subject, hi, intro, button, or, expires, sign string }{
+			"رمز Speak Up Fearless الخاص بك: " + code,
+			"مرحبًا،",
+			"اضغط الزر لتأكيد بريدك الإلكتروني، أو أدخل هذا الرمز في الموقع:",
+			"تأكيد بريدي الإلكتروني",
+			"رمزك",
+			"تنتهي صلاحية الرمز خلال 10 دقائق. إذا لم تقم بالتسجيل، يمكنك تجاهل هذه الرسالة.",
+			"Speak Up Fearless",
+		}
+		dir = "rtl"
+	}
+	text := t.hi + "\n\n" + t.intro + "\n\n" + code + "\n\n" + t.button + ": " + link + "\n\n" + t.expires + "\n\n" + t.sign
+	esc := html.EscapeString
+	htmlBody := `<!doctype html><html dir="` + dir + `"><body style="margin:0;background:#F3E3C8;font-family:Inter,Segoe UI,Arial,sans-serif;color:#2B1D14">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td align="center" style="padding:32px 16px">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:480px;background:#FFFAF3;border-radius:20px;padding:32px">
+<tr><td style="font-size:20px;font-weight:700;padding-bottom:16px">` + esc(t.sign) + `</td></tr>
+<tr><td style="font-size:16px;line-height:1.5;padding-bottom:8px">` + esc(t.hi) + `</td></tr>
+<tr><td style="font-size:16px;line-height:1.5;padding-bottom:24px">` + esc(t.intro) + `</td></tr>
+<tr><td align="center" style="padding-bottom:24px"><a href="` + esc(link) + `" style="display:inline-block;background:#C2622D;color:#ffffff;text-decoration:none;font-weight:700;font-size:17px;padding:14px 32px;border-radius:999px">` + esc(t.button) + `</a></td></tr>
+<tr><td align="center" style="font-size:13px;color:#7A6656;padding-bottom:6px">` + esc(t.or) + `</td></tr>
+<tr><td align="center" style="font-size:34px;font-weight:700;letter-spacing:8px;padding-bottom:24px">` + code + `</td></tr>
+<tr><td style="font-size:13px;line-height:1.5;color:#7A6656">` + esc(t.expires) + `</td></tr>
+</table></td></tr></table></body></html>`
+	return mail.Message{Subject: t.subject, Text: text, HTML: htmlBody}
 }

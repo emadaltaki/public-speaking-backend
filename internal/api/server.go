@@ -26,6 +26,10 @@ type Config struct {
 	AdminEmails []string
 	// Mailer sends verification codes. Nil when SMTP isn't configured.
 	Mailer mail.Sender
+	// SiteURL is where the "Verify my email" link sends people afterwards,
+	// and PublicURL is this API's own address, used to build that link.
+	SiteURL   string
+	PublicURL string
 }
 
 type Server struct {
@@ -59,6 +63,7 @@ func (s *Server) Handler() http.Handler {
 	mux.Handle("PATCH /v1/me", s.requireUser(s.patchMe))
 	mux.Handle("POST /v1/me/verify/send", s.requireUser(s.sendVerifyCode))
 	mux.Handle("POST /v1/me/verify/check", s.requireUser(s.checkVerifyCode))
+	mux.HandleFunc("GET /v1/verify/link", s.verifyLink)
 
 	mux.Handle("POST /v1/games/sessions", s.requireUser(s.addGameSession))
 	mux.Handle("GET /v1/games/sessions", s.requireUser(s.listGameSessions))

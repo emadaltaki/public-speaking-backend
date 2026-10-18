@@ -33,6 +33,7 @@ All responses are JSON. Errors look like `{"error": "message"}`.
 | PATCH | `/v1/me` | user | Update `displayName`, `language` (`"en"` or `"ar"`) and/or `avatar` (JPEG, PNG or WebP data URL up to 200 KB; `""` removes it). Profiles return `avatar` as the data URL or `null` |
 | POST | `/v1/me/verify/send` | user | Email a 6-digit code to the user (English or Arabic by their language). Returns `{"sent":true}`, or `{"verified":true}` if the email is already verified (Google sign-ins). 1 per minute and 5 per hour per user, else 429 `{"retryAfter": seconds}`. 503 if email isn't configured |
 | POST | `/v1/me/verify/check` | user | `{"code":"123456"}`. Returns `{"verified":true}`; a wrong code gives 400 `{"error":"wrong","attemptsLeft":n}`; an expired code or one with 5 misses gives 400 `{"error":"expired"}`. Codes last 10 minutes |
+| GET | `/v1/verify/link?u=&c=` | none | The "Verify my email" button in the code email. Verifies with the code in the link (same expiry and attempt limits), then redirects to `SITE_URL/login?verify=verified|wrong|expired` |
 | POST | `/v1/games/sessions` | user | Record a finished round: `gameId`, `durationSeconds`, optional `score`, optional `details` object |
 | GET | `/v1/games/sessions?gameId=&limit=` | user | Recent rounds, newest first (limit 1–200, default 50) |
 | GET | `/v1/games/progress` | user | Per game: plays, total seconds, best score, last played |
@@ -66,6 +67,9 @@ await http.post(
 | `ALLOWED_ORIGINS` | `https://public-speaking-lemon.vercel.app` | Comma-separated exact origins for CORS |
 | `ALLOW_LOCALHOST` | `true` | Also allow `http://localhost:<port>` for local Flutter runs |
 | `ADMIN_EMAILS` | empty | Comma-separated |
+| `BREVO_API_KEY` | empty | Send verification emails through Brevo (free, 300/day) instead of SMTP. Needs `MAIL_FROM` set to a sender confirmed in Brevo |
+| `SITE_URL` | `https://public-speaking-lemon.vercel.app` | Where the email button sends people after verifying |
+| `PUBLIC_URL` | `https://public-speaking-backend.vercel.app` | This API's address, used in the email button link |
 | `SMTP_HOST` | empty | e.g. `smtp.gmail.com`. Verification emails are off until host, user, password and sender are all set |
 | `SMTP_PORT` | `587` | 587 uses STARTTLS, 465 uses TLS |
 | `SMTP_USER` | empty | e.g. your Gmail address |
