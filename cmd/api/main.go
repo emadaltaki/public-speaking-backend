@@ -6,6 +6,7 @@ import (
 	"errors"
 	"log/slog"
 	"net/http"
+	netmail "net/mail"
 	"os"
 	"os/signal"
 	"strings"
@@ -54,6 +55,15 @@ func run(log *slog.Logger) error {
 		User: os.Getenv("SMTP_USER"),
 		Pass: os.Getenv("SMTP_PASS"),
 		From: os.Getenv("MAIL_FROM"),
+	}
+	// Be forgiving: SMTP_USER may be pasted as "Name <address>", spaces in a
+	// Gmail App Password are optional, and MAIL_FROM defaults to SMTP_USER.
+	if addr, err := netmail.ParseAddress(smtpCfg.User); err == nil {
+		smtpCfg.User = addr.Address
+	}
+	smtpCfg.Pass = strings.ReplaceAll(smtpCfg.Pass, " ", "")
+	if smtpCfg.From == "" {
+		smtpCfg.From = smtpCfg.User
 	}
 	if smtpCfg.Host != "" && smtpCfg.User != "" && smtpCfg.Pass != "" && smtpCfg.From != "" {
 		mailer = smtpCfg
