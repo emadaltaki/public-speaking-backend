@@ -95,7 +95,11 @@ func (s *Server) sendVerifyCode(w http.ResponseWriter, r *http.Request) {
 	defer cancel()
 	if err := s.cfg.Mailer.Send(ctx, msg); err != nil {
 		s.log.Error("send code email", "err", err)
-		writeError(w, http.StatusBadGateway, "could not send email")
+		resp := map[string]string{"error": "could not send email"}
+		if hint := mail.Hint(err); hint != "" {
+			resp["detail"] = hint
+		}
+		writeJSON(w, http.StatusBadGateway, resp)
 		return
 	}
 	// Only emails that actually went out count towards the limits, so a

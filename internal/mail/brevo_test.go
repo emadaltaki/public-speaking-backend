@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 )
 
@@ -33,7 +34,11 @@ func TestBrevoSend(t *testing.T) {
 	}))
 	defer fail.Close()
 	b.URL = fail.URL
-	if err := b.Send(context.Background(), Message{To: "you@example.com"}); err == nil {
-		t.Fatal("expected an error from a 400 response")
+	err := b.Send(context.Background(), Message{To: "you@example.com"})
+	if err == nil || !strings.Contains(Hint(err), "Senders") {
+		t.Fatalf("sender error hint: %v / %q", err, Hint(err))
+	}
+	if h := Hint(&ProviderError{Status: 401, Body: `{"message":"Key not found"}`}); !strings.Contains(h, "xkeysib-") {
+		t.Fatalf("401 hint: %q", h)
 	}
 }

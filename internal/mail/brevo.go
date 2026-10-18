@@ -4,10 +4,12 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"net/mail"
+	"strings"
 )
 
 // Brevo sends email through Brevo's HTTP API (free plan: 300 emails a day).
@@ -57,7 +59,42 @@ func (b Brevo) Send(ctx context.Context, m Message) error {
 	defer resp.Body.Close()
 	if resp.StatusCode/100 != 2 {
 		msg, _ := io.ReadAll(io.LimitReader(resp.Body, 1024))
-		return fmt.Errorf("brevo: status %d: %s", resp.StatusCode, msg)
+		return &ProviderError{Status: resp.StatusCode, Body: string(msg)}
 	}
 	return nil
+}
+
+// ProviderError is a rejection from the email provider's API.
+type ProviderError struct {
+	Status int
+	Body   string
+}
+
+func (e *ProviderError) Error() string {
+	return fmt.Sprintf("brevo: status %d: %s", e.Status, e.Body)
+}
+
+// Hint explains a send failure in a sentence that is safe to show while the
+// email settings are being set up. It never includes keys or passwords.
+func Hint(err error) string {
+	var pe *ProviderError
+	switch {
+	case errors.As(err, &pe) && pe.Status == http.StatusUnauthorized:
+		return "Brevo rejected BREVO_API_KEY. Use an API key (it starts with xkeysib-), not an SMTP key (xsmtpsib-)."
+	case errors.As(err, &pe) && strings.Contains(strings.ToLower(pe.Body), "sender"):
+		return "Brevo doesn't accept the MAIL_FROM address yet. Add it under Senders in Brevo and click the confirmation email."
+	case errors.As(err, &pe):
+		var body struct {
+			Message string `json:"message"`
+		}
+		if json.Unmarshal([]byte(pe.Body), &body) == nil && body.Message != "" {
+			return "Brevo said: " + body.Message
+		}
+		return fmt.Sprintf("Brevo returned status %d.", pe.Status)
+	case err != nil && strings.HasPrefix(err.Error(), "auth:"):
+		return "The SMTP login was refused. Check SMTP_USER and SMTP_PASS (Gmail needs an App Password)."
+	case err != nil && strings.HasPrefix(err.Error(), "MAIL_FROM:"):
+		return "MAIL_FROM isn't a valid address. Use: Speak Up Fearless <you@gmail.com>"
+	}
+	return ""
 }
