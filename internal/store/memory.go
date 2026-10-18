@@ -203,7 +203,13 @@ func (m *Memory) PutEmailCode(_ context.Context, c EmailCode) error {
 	defer m.mu.Unlock()
 	c.Attempts = 0
 	m.codes[c.UID] = c
-	m.sends[c.UID] = append(m.sends[c.UID], time.Now())
+	return nil
+}
+
+func (m *Memory) RecordCodeSend(_ context.Context, uid string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.sends[uid] = append(m.sends[uid], time.Now())
 	return nil
 }
 

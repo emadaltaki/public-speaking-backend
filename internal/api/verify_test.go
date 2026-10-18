@@ -175,7 +175,7 @@ func TestVerifyHourlyLimit(t *testing.T) {
 	do(t, h, "GET", "/v1/me", "pw", nil)
 	// Five sends spread over the last hour, the newest over a minute ago.
 	for i := 0; i < 5; i++ {
-		_ = st.PutEmailCode(context.Background(), store.EmailCode{UID: "pw", Email: "pw@example.com", ExpiresAt: time.Now()})
+		_ = st.RecordCodeSend(context.Background(), "pw")
 	}
 	st.ShiftSends("pw", -2*time.Minute)
 	rec, body := do(t, h, "POST", "/v1/me/verify/send", "pw", nil)
@@ -207,6 +207,11 @@ func TestVerifyMailFailure(t *testing.T) {
 	h, _ := newVerifyServer(t, m)
 	if rec, _ := do(t, h, "POST", "/v1/me/verify/send", "pw", nil); rec.Code != 502 {
 		t.Fatalf("mail failure: got %d", rec.Code)
+	}
+	// A failed send doesn't count, so an immediate retry is allowed.
+	m.fail = false
+	if rec, body := do(t, h, "POST", "/v1/me/verify/send", "pw", nil); rec.Code != 200 {
+		t.Fatalf("retry after failure: %d %v", rec.Code, body)
 	}
 }
 

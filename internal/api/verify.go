@@ -94,6 +94,11 @@ func (s *Server) sendVerifyCode(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadGateway, "could not send email")
 		return
 	}
+	// Only emails that actually went out count towards the limits, so a
+	// mail-server hiccup doesn't lock the visitor out.
+	if err := s.store.RecordCodeSend(r.Context(), u.UID); err != nil {
+		s.log.Error("record code send", "err", err)
+	}
 	writeJSON(w, http.StatusOK, map[string]bool{"sent": true})
 }
 

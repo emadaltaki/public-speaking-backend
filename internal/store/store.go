@@ -90,8 +90,10 @@ type Store interface {
 	SetBookingStatus(ctx context.Context, id int64, status string) (Booking, error)
 
 	SetEmailVerified(ctx context.Context, uid string) error
-	// PutEmailCode replaces the user's pending code and records the send.
+	// PutEmailCode replaces the user's pending code.
 	PutEmailCode(ctx context.Context, c EmailCode) error
+	// RecordCodeSend notes that a code email went out, for rate limits.
+	RecordCodeSend(ctx context.Context, uid string) error
 	GetEmailCode(ctx context.Context, uid string) (EmailCode, error)
 	// AddCodeAttempt counts a wrong guess and returns the attempts so far.
 	AddCodeAttempt(ctx context.Context, uid string) (int, error)

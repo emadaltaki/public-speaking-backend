@@ -108,6 +108,8 @@ func TestStoreContract(t *testing.T) {
 			if err := st.PutEmailCode(ctx, EmailCode{UID: uid, Email: "b@example.com", CodeHash: "h2", ExpiresAt: exp}); err != nil {
 				t.Fatal(err)
 			}
+			_ = st.RecordCodeSend(ctx, uid)
+			_ = st.RecordCodeSend(ctx, uid)
 			c, err := st.GetEmailCode(ctx, uid)
 			if err != nil || c.CodeHash != "h2" || c.Attempts != 0 || c.ExpiresAt.Unix() != exp.Unix() {
 				t.Fatalf("replaced code: %v %+v", err, c)

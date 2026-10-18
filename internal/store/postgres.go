@@ -232,19 +232,19 @@ func (p *Postgres) SetEmailVerified(ctx context.Context, uid string) error {
 }
 
 func (p *Postgres) PutEmailCode(ctx context.Context, c EmailCode) error {
-	return pgx.BeginFunc(ctx, p.pool, func(tx pgx.Tx) error {
-		if _, err := tx.Exec(ctx, `
+	_, err := p.pool.Exec(ctx, `
 			INSERT INTO email_codes (uid, email, code_hash, expires_at, attempts)
 			VALUES ($1, $2, $3, $4, 0)
 			ON CONFLICT (uid) DO UPDATE SET
 				email = EXCLUDED.email, code_hash = EXCLUDED.code_hash,
 				expires_at = EXCLUDED.expires_at, attempts = 0, created_at = now()`,
-			c.UID, c.Email, c.CodeHash, c.ExpiresAt); err != nil {
-			return err
-		}
-		_, err := tx.Exec(ctx, `INSERT INTO email_code_sends (uid) VALUES ($1)`, c.UID)
-		return err
-	})
+		c.UID, c.Email, c.CodeHash, c.ExpiresAt)
+	return err
+}
+
+func (p *Postgres) RecordCodeSend(ctx context.Context, uid string) error {
+	_, err := p.pool.Exec(ctx, `INSERT INTO email_code_sends (uid) VALUES ($1)`, uid)
+	return err
 }
 
 func (p *Postgres) GetEmailCode(ctx context.Context, uid string) (EmailCode, error) {
