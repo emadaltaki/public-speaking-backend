@@ -1,6 +1,7 @@
 package speech
 
 import (
+	"net/url"
 	"context"
 	"encoding/json"
 	"errors"
@@ -112,7 +113,7 @@ func TestClaudeCoach(t *testing.T) {
 		t.Fatal(err)
 	}
 	oc := req["output_config"].(map[string]any)
-	if req["model"] != "claude-opus-5-5" || req["fallbacks"] != "default" || oc["effort"] != "medium" ||
+	if req["model"] != "claude-sonnet-5-5" || req["fallbacks"] != "default" || oc["effort"] != "medium" ||
 		oc["format"].(map[string]any)["type"] != "json_schema" || !strings.Contains(beta, "server-side-fallback-2026-07-01") {
 		t.Fatalf("request: beta=%q body=%v", beta, req)
 	}
@@ -127,5 +128,48 @@ func TestClaudeCoach(t *testing.T) {
 	stop = "refusal"
 	if _, err := c.Evaluate(context.Background(), CoachInput{Transcript: "x"}); !errors.Is(err, ErrDeclined) {
 		t.Fatalf("refusal: %v", err)
+	}
+}
+
+func TestDeepgram(t *testing.T) {
+	var q url.Values
+	var auth, ctype string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		q, auth, ctype = r.URL.Query(), r.Header.Get("Authorization"), r.Header.Get("Content-Type")
+		if q.Get("language") == "xx" {
+			http.Error(w, `{"err_msg":"bad audio"}`, http.StatusBadRequest)
+			return
+		}
+		io.WriteString(w, `{"results":{"channels":[{"alternatives":[{"words":[{"word":"um","punctuated_word":"Um,","start":0.1,"end":0.3},{"word":"hello","punctuated_word":"hello.","start":0.4,"end":0.8}]}]}]}}`)
+	}))
+	defer srv.Close()
+	d := Deepgram{APIKey: "k", BaseURL: srv.URL}
+	got, err := d.Transcribe(context.Background(), []byte("audio"), "recording.webm", "audio/webm", "en")
+	if err != nil || len(got) != 2 || got[0].Text != "Um," || got[1].Start != 0.4 {
+		t.Fatalf("transcribe: %v %+v", err, got)
+	}
+	if auth != "Token k" || ctype != "audio/webm" || q.Get("model") != "nova-3" || q.Get("filler_words") != "true" || q.Get("language") != "en" {
+		t.Fatalf("request: auth=%q type=%q query=%v", auth, ctype, q)
+	}
+	if _, m := Analyze(got, "en"); m.FillerCount != 1 {
+		t.Fatalf("filler from deepgram not counted: %+v", m)
+	}
+	if _, err := d.Transcribe(context.Background(), []byte("audio"), "r.webm", "audio/webm", "xx"); !errors.Is(err, ErrBadAudio) {
+		t.Fatalf("400 should be ErrBadAudio, got %v", err)
+	}
+}
+
+type fixedTranscriber string
+
+func (f fixedTranscriber) Transcribe(context.Context, []byte, string, string, string) ([]Word, error) {
+	return []Word{{Text: string(f)}}, nil
+}
+
+func TestByLanguage(t *testing.T) {
+	b := ByLanguage{Default: fixedTranscriber("deepgram"), ByLang: map[string]Transcriber{"ar": fixedTranscriber("elevenlabs")}}
+	en, _ := b.Transcribe(context.Background(), nil, "", "", "en")
+	ar, _ := b.Transcribe(context.Background(), nil, "", "", "ar")
+	if en[0].Text != "deepgram" || ar[0].Text != "elevenlabs" {
+		t.Fatalf("routing: en=%v ar=%v", en, ar)
 	}
 }

@@ -86,14 +86,26 @@ func run(log *slog.Logger) error {
 
 	var transcriber speech.Transcriber
 	var coach speech.Coach
+	// Deepgram transcribes; ElevenLabs, when its key is also set, takes Arabic
+	// recordings, where it is more accurate. Either one alone also works.
+	var elevenlabs speech.Transcriber
 	if key := os.Getenv("ELEVENLABS_API_KEY"); key != "" {
-		transcriber = speech.ElevenLabs{APIKey: key, Model: env("ELEVENLABS_STT_MODEL", "scribe_v2")}
+		elevenlabs = speech.ElevenLabs{APIKey: key, Model: env("ELEVENLABS_STT_MODEL", "scribe_v2")}
+	}
+	if key := os.Getenv("DEEPGRAM_API_KEY"); key != "" {
+		router := speech.ByLanguage{Default: speech.Deepgram{APIKey: key, Model: env("DEEPGRAM_MODEL", "nova-3")}}
+		if elevenlabs != nil {
+			router.ByLang = map[string]speech.Transcriber{"ar": elevenlabs}
+		}
+		transcriber = router
+	} else if elevenlabs != nil {
+		transcriber = elevenlabs
 	}
 	if key := os.Getenv("ANTHROPIC_API_KEY"); key != "" {
-		coach = speech.NewClaude(key)
+		coach = speech.NewClaude(key).WithModel(env("CLAUDE_COACH_MODEL", "claude-sonnet-5-5"))
 	}
 	if transcriber == nil || coach == nil {
-		log.Warn("ELEVENLABS_API_KEY or ANTHROPIC_API_KEY not set: the speaking coach is off")
+		log.Warn("DEEPGRAM_API_KEY (or ELEVENLABS_API_KEY) or ANTHROPIC_API_KEY not set: the speaking coach is off")
 	}
 
 	srv := api.NewServer(api.Config{
