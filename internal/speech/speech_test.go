@@ -217,3 +217,12 @@ func TestCleanStory(t *testing.T) {
 		t.Fatalf("story not cleaned: %+v", fb.Story)
 	}
 }
+
+func TestCleanPractice(t *testing.T) {
+	if fb := Clean(Feedback{Practice: Practice{Game: "chess"}}, 60); fb.Practice.Game != "triple-step" {
+		t.Fatalf("unknown game should fall back: %+v", fb.Practice)
+	}
+	if fb := Clean(Feedback{Practice: Practice{Game: "conductor"}}, 60); fb.Practice.Game != "conductor" {
+		t.Fatalf("known game kept: %+v", fb.Practice)
+	}
+}
