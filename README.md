@@ -80,7 +80,7 @@ await http.post(
 | `ANTHROPIC_API_KEY` | empty | Claude, which writes the coach's scores and feedback (model `claude-opus-5-5`) |
 | `ELEVENLABS_STT_MODEL` | `scribe_v2` | ElevenLabs speech-to-text model |
 | `BREVO_API_KEY` | empty | Send verification emails through Brevo (free, 300/day) instead of SMTP. Needs `MAIL_FROM` set to a sender confirmed in Brevo |
-| `SITE_URL` | `https://public-speaking-lemon.vercel.app` | Where the email button sends people after verifying |
+| `SITE_URL` | `https://speakup-ca500.web.app` | Where the email button sends people after verifying |
 | `PUBLIC_URL` | `https://public-speaking-backend.vercel.app` | This API's address, used in the email button link |
 | `SMTP_HOST` | empty | e.g. `smtp.gmail.com`. Verification emails are off until host, user, password and sender are all set |
 | `SMTP_PORT` | `587` | 587 uses STARTTLS, 465 uses TLS |

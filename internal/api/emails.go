@@ -22,6 +22,7 @@ type emailView struct {
 	ButtonURL   string
 	Note        string // small print under the button
 	SiteURL     string
+	SiteHost    string // SiteURL without the scheme, shown in the footer
 	LogoURL     string
 	Tagline     string
 	UnsubLabel  string
@@ -81,7 +82,7 @@ var emailLayout = template.Must(template.New("email").Parse(`<!doctype html>
     </td></tr>
     <tr><td align="center" class="muted" style="padding:20px 12px 0;font-family:Inter,'Segoe UI',Arial,sans-serif;font-size:12px;line-height:1.6;color:#6E645B">
       {{.Tagline}}<br>
-      <a href="{{.SiteURL}}" style="color:#B4583A">public-speaking-lemon.vercel.app</a>
+      <a href="{{.SiteURL}}" style="color:#B4583A">{{.SiteHost}}</a>
       {{if .UnsubURL}} &middot; <a href="{{.UnsubURL}}" style="color:#6E645B">{{.UnsubLabel}}</a>{{end}}
     </td></tr>
   </table>
@@ -93,6 +94,7 @@ var emailLayout = template.Must(template.New("email").Parse(`<!doctype html>
 // render builds the HTML and a plain-text fallback from the same content.
 func (s *Server) render(v emailView, subject string) mail.Message {
 	v.SiteURL = s.cfg.SiteURL
+	v.SiteHost = strings.TrimPrefix(strings.TrimPrefix(s.cfg.SiteURL, "https://"), "http://")
 	v.LogoURL = s.cfg.SiteURL + "/icons/Icon-192.png"
 	v.Dir = "ltr"
 	if v.Lang == "ar" {
