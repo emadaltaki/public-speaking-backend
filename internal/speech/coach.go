@@ -70,8 +70,16 @@ type Claude struct {
 func NewClaude(apiKey string, opts ...option.RequestOption) *Claude {
 	return &Claude{
 		client: anthropic.NewClient(append([]option.RequestOption{option.WithAPIKey(apiKey)}, opts...)...),
-		model:  "claude-opus-5-5",
+		model:  "claude-sonnet-5-5",
 	}
+}
+
+// WithModel switches the Claude model, for example back to claude-opus-5-5.
+func (c *Claude) WithModel(model string) *Claude {
+	if model != "" {
+		c.model = model
+	}
+	return c
 }
 
 const coachSystem = `You are a warm, honest public speaking coach for Speak Up Fearless, a community that helps people who feel anxious about speaking. You review one short practice recording at a time.

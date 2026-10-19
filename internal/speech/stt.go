@@ -1,5 +1,5 @@
-// Package speech turns a recording into a scored speaking report: ElevenLabs
-// transcribes it with word timings, Go measures pace, pauses and filler words,
+// Package speech turns a recording into a scored speaking report: Deepgram
+// (or ElevenLabs) transcribes it with word timings, Go measures pace, pauses and filler words,
 // and Claude writes the scores and feedback.
 package speech
 
