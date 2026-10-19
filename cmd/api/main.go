@@ -86,20 +86,21 @@ func run(log *slog.Logger) error {
 
 	var transcriber speech.Transcriber
 	var coach speech.Coach
-	// Deepgram transcribes; ElevenLabs, when its key is also set, takes Arabic
-	// recordings, where it is more accurate. Either one alone also works.
-	var elevenlabs speech.Transcriber
+	// ElevenLabs Scribe writes down every "um" and "uh", so it goes first when
+	// its key is set; Deepgram steps in if ElevenLabs is down. Either key alone
+	// also works.
+	var elevenlabs, deepgram speech.Transcriber
 	if key := os.Getenv("ELEVENLABS_API_KEY"); key != "" {
 		elevenlabs = speech.ElevenLabs{APIKey: key, Model: env("ELEVENLABS_STT_MODEL", "scribe_v2")}
 	}
 	if key := os.Getenv("DEEPGRAM_API_KEY"); key != "" {
-		router := speech.ByLanguage{Default: speech.Deepgram{APIKey: key, Model: env("DEEPGRAM_MODEL", "nova-3")}}
-		if elevenlabs != nil {
-			router.ByLang = map[string]speech.Transcriber{"ar": elevenlabs}
-		}
-		transcriber = router
-	} else if elevenlabs != nil {
-		transcriber = elevenlabs
+		deepgram = speech.Deepgram{APIKey: key, Model: env("DEEPGRAM_MODEL", "nova-3")}
+	}
+	switch {
+	case elevenlabs != nil:
+		transcriber = speech.Fallback{Primary: elevenlabs, Backup: deepgram}
+	case deepgram != nil:
+		transcriber = deepgram
 	}
 	if key := os.Getenv("ANTHROPIC_API_KEY"); key != "" {
 		coach = speech.NewClaude(key).WithModel(env("CLAUDE_COACH_MODEL", "claude-sonnet-5-5"))
