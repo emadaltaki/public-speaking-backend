@@ -110,6 +110,9 @@ func TestEmailModes(t *testing.T) {
 	if got := off.subjects(); len(got) != 0 {
 		t.Fatalf("mode off sent: %v", got)
 	}
+	if withoutPlusTag("Me+Test1@gmail.com") != "Me@gmail.com" {
+		t.Fatalf("plus tag not removed")
+	}
 	test := newStreakEnv(t, "test", "BOB@example.com")
 	do(t, test.h, "GET", "/v1/me", "ada", nil)
 	do(t, test.h, "GET", "/v1/me", "bob", nil)

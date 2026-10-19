@@ -27,12 +27,26 @@ func (s *Server) mayEmail(u store.User) bool {
 		return true
 	case "test":
 		for _, e := range s.cfg.EmailTestList {
-			if strings.EqualFold(e, u.Email) {
+			if strings.EqualFold(e, u.Email) || strings.EqualFold(e, withoutPlusTag(u.Email)) {
 				return true
 			}
 		}
 	}
 	return false
+}
+
+// withoutPlusTag turns "me+test1@gmail.com" into "me@gmail.com", so a tester
+// can make fresh accounts with plus-addresses that land in their own inbox.
+func withoutPlusTag(email string) string {
+	at := strings.LastIndex(email, "@")
+	if at < 0 {
+		return email
+	}
+	local, domain := email[:at], email[at:]
+	if plus := strings.Index(local, "+"); plus >= 0 {
+		local = local[:plus]
+	}
+	return local + domain
 }
 
 func (s *Server) unsubToken(uid string) string {

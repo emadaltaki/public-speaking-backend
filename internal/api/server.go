@@ -136,10 +136,6 @@ func (s *Server) authenticate(r *http.Request) (*store.User, *auth.User, error) 
 		}
 		u.EmailVerified = true
 		s.maybeWelcome(r.Context(), u)
-	} else if s.cfg.EmailMode == "test" && u.EmailVerified {
-		// In test mode, testers also get the welcome email (once) on an
-		// account that was created before welcome emails existed.
-		s.maybeWelcome(r.Context(), u)
 	}
 	return &u, claims, nil
 }
