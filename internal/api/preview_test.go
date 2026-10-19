@@ -15,7 +15,7 @@ func TestWritePreviews(t *testing.T) {
 	if dir == "" {
 		t.Skip("EMAIL_PREVIEW_DIR not set")
 	}
-	s := NewServer(Config{SiteURL: "https://public-speaking-lemon.vercel.app", PublicURL: "https://public-speaking-backend.vercel.app"},
+	s := NewServer(Config{SiteURL: "https://speakup-ca500.web.app", PublicURL: "https://public-speaking-backend.vercel.app"},
 		nil, nil, slog.New(slog.NewTextHandler(io.Discard, nil)))
 	info := userEmailInfo{Name: "Sara Ahmed", Lang: "en", Unsub: "https://public-speaking-backend.vercel.app/v1/email/unsubscribe?u=x&t=y"}
 	ar := info
