@@ -16,7 +16,10 @@ import (
 	"github.com/emadaltaki/public-speaking-backend/internal/store"
 )
 
-type sentMail struct{ to, subject, body, html string }
+type sentMail struct {
+	to, subject, body, html string
+	headers                 map[string]string
+}
 
 type fakeMailer struct {
 	mu   sync.Mutex
@@ -30,7 +33,7 @@ func (m *fakeMailer) Send(_ context.Context, msg mail.Message) error {
 	if m.fail {
 		return io.ErrUnexpectedEOF
 	}
-	m.sent = append(m.sent, sentMail{msg.To, msg.Subject, msg.Text, msg.HTML})
+	m.sent = append(m.sent, sentMail{msg.To, msg.Subject, msg.Text, msg.HTML, msg.Headers})
 	return nil
 }
 

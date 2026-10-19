@@ -22,6 +22,7 @@ type Message struct {
 	Subject string
 	Text    string
 	HTML    string
+	Headers map[string]string // extra headers such as List-Unsubscribe
 }
 
 // Sender sends one email.
@@ -103,6 +104,9 @@ func buildMessage(from string, m Message) []byte {
 	b.WriteString("To: " + m.To + crlf)
 	b.WriteString("Subject: " + mime.QEncoding.Encode("utf-8", m.Subject) + crlf)
 	b.WriteString("Date: " + time.Now().UTC().Format(time.RFC1123Z) + crlf)
+	for k, v := range m.Headers {
+		b.WriteString(k + ": " + v + crlf)
+	}
 	b.WriteString("MIME-Version: 1.0" + crlf)
 	if m.HTML == "" {
 		writePart(&b, "text/plain", m.Text)

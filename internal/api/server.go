@@ -30,6 +30,15 @@ type Config struct {
 	// and PublicURL is this API's own address, used to build that link.
 	SiteURL   string
 	PublicURL string
+	// CronSecret authenticates the scheduled reminder run and signs
+	// unsubscribe links. Personal emails stay off without it.
+	CronSecret string
+	// EmailMode gates welcome and streak emails: "off", "test" (only
+	// EmailTestList) or "on".
+	EmailMode     string
+	EmailTestList []string
+	// DefaultTimeZone is used until the site sends a user's own time zone.
+	DefaultTimeZone string
 }
 
 type Server struct {
@@ -64,6 +73,10 @@ func (s *Server) Handler() http.Handler {
 	mux.Handle("POST /v1/me/verify/send", s.requireUser(s.sendVerifyCode))
 	mux.Handle("POST /v1/me/verify/check", s.requireUser(s.checkVerifyCode))
 	mux.HandleFunc("GET /v1/verify/link", s.verifyLink)
+	mux.HandleFunc("GET /v1/cron/streak-reminders", s.cronStreakReminders)
+	mux.HandleFunc("POST /v1/cron/streak-reminders", s.cronStreakReminders)
+	mux.HandleFunc("GET /v1/email/unsubscribe", s.unsubscribe)
+	mux.HandleFunc("POST /v1/email/unsubscribe", s.unsubscribe)
 
 	mux.Handle("POST /v1/games/sessions", s.requireUser(s.addGameSession))
 	mux.Handle("GET /v1/games/sessions", s.requireUser(s.listGameSessions))
@@ -113,6 +126,7 @@ func (s *Server) authenticate(r *http.Request) (*store.User, *auth.User, error) 
 			return nil, nil, err
 		}
 		u.EmailVerified = true
+		s.maybeWelcome(r.Context(), u)
 	}
 	return &u, claims, nil
 }

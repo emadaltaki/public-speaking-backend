@@ -30,10 +30,12 @@ All responses are JSON. Errors look like `{"error": "message"}`.
 | --- | --- | --- | --- |
 | GET | `/healthz` | none | `{"status":"ok"}`, or 503 if the database is down |
 | GET | `/v1/me` | user | Current user's profile (created on first call), including `emailVerified` |
-| PATCH | `/v1/me` | user | Update `displayName`, `language` (`"en"` or `"ar"`) and/or `avatar` (JPEG, PNG or WebP data URL up to 200 KB; `""` removes it). Profiles return `avatar` as the data URL or `null` |
+| PATCH | `/v1/me` | user | Update `timeZone` (IANA name, unknown ones ignored), `streakEmails` (bool), `displayName`, `language` (`"en"` or `"ar"`) and/or `avatar` (JPEG, PNG or WebP data URL up to 200 KB; `""` removes it). Profiles return `avatar` as the data URL or `null` |
 | POST | `/v1/me/verify/send` | user | Email a 6-digit code to the user (English or Arabic by their language). Returns `{"sent":true}`, or `{"verified":true}` if the email is already verified (Google sign-ins). 1 per minute and 5 per hour per user, else 429 `{"retryAfter": seconds}`. 503 if email isn't configured |
 | POST | `/v1/me/verify/check` | user | `{"code":"123456"}`. Returns `{"verified":true}`; a wrong code gives 400 `{"error":"wrong","attemptsLeft":n}`; an expired code or one with 5 misses gives 400 `{"error":"expired"}`. Codes last 10 minutes |
 | GET | `/v1/verify/link?u=&c=` | none | The "Verify my email" button in the code email. Verifies with the code in the link (same expiry and attempt limits), then redirects to `SITE_URL/login?verify=verified|wrong|expired` |
+| GET/POST | `/v1/cron/streak-reminders` | `Authorization: Bearer CRON_SECRET` | Run hourly (see `.github/workflows/streak-reminders.yml`). Emails people whose local time is 19:00 or later, who have a streak and haven't played the daily round today. At most once per person per day. Returns counts |
+| GET/POST | `/v1/email/unsubscribe?u=&t=` | signed link | Turns off streak emails (link and List-Unsubscribe header in every streak and welcome email), then redirects to `SITE_URL/account?emails=off` |
 | POST | `/v1/games/sessions` | user | Record a finished round: `gameId`, `durationSeconds`, optional `score`, optional `details` object |
 | GET | `/v1/games/sessions?gameId=&limit=` | user | Recent rounds, newest first (limit 1–200, default 50) |
 | GET | `/v1/games/progress` | user | Per game: plays, total seconds, best score, last played |
@@ -67,6 +69,10 @@ await http.post(
 | `ALLOWED_ORIGINS` | `https://public-speaking-lemon.vercel.app` | Comma-separated exact origins for CORS |
 | `ALLOW_LOCALHOST` | `true` | Also allow `http://localhost:<port>` for local Flutter runs |
 | `ADMIN_EMAILS` | empty | Comma-separated |
+| `STREAK_EMAILS` | `off` | Welcome and streak emails: `off`, `test` (only the addresses in `STREAK_EMAILS_TEST`) or `on` (everyone who hasn't opted out). Verification codes are not affected |
+| `STREAK_EMAILS_TEST` | empty | Comma-separated addresses that get emails in `test` mode |
+| `CRON_SECRET` | empty | Long random string. Protects the reminder endpoint and signs unsubscribe links; welcome and streak emails stay off without it. Also add it as a GitHub Actions repository secret with the same name |
+| `DEFAULT_TIME_ZONE` | `America/Toronto` | Used for people whose browser hasn't sent a time zone yet |
 | `BREVO_API_KEY` | empty | Send verification emails through Brevo (free, 300/day) instead of SMTP. Needs `MAIL_FROM` set to a sender confirmed in Brevo |
 | `SITE_URL` | `https://public-speaking-lemon.vercel.app` | Where the email button sends people after verifying |
 | `PUBLIC_URL` | `https://public-speaking-backend.vercel.app` | This API's address, used in the email button link |

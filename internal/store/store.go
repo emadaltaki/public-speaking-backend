@@ -18,6 +18,8 @@ type User struct {
 	Language      string    `json:"language"` // "en" or "ar"
 	Avatar        *string   `json:"avatar"`   // profile picture as a data URL, null when unset
 	EmailVerified bool      `json:"emailVerified"`
+	TimeZone      string    `json:"timeZone"`     // IANA name such as "America/Toronto"; empty until the site sends it
+	StreakEmails  bool      `json:"streakEmails"` // streak start and reminder emails
 	CreatedAt     time.Time `json:"createdAt"`
 	LastSeenAt    time.Time `json:"lastSeenAt"`
 }
@@ -25,9 +27,11 @@ type User struct {
 // UserUpdate holds profile changes; nil fields are left as they are. An empty
 // Avatar clears the picture.
 type UserUpdate struct {
-	DisplayName *string
-	Language    *string
-	Avatar      *string
+	DisplayName  *string
+	Language     *string
+	Avatar       *string
+	TimeZone     *string
+	StreakEmails *bool
 }
 
 // EmailCode is the pending verification code for one user. Only a hash of the
@@ -100,6 +104,15 @@ type Store interface {
 	DeleteEmailCode(ctx context.Context, uid string) error
 	// CodeSendsSince returns when codes were sent to the user since t, newest first.
 	CodeSendsSince(ctx context.Context, uid string, t time.Time) ([]time.Time, error)
+
+	// MarkStreakEmail records that a streak email of this kind is going out
+	// for the user's local day. It returns false if one already went out.
+	MarkStreakEmail(ctx context.Context, uid, kind, localDate string) (bool, error)
+	// UnmarkStreakEmail undoes MarkStreakEmail when the email failed to send.
+	UnmarkStreakEmail(ctx context.Context, uid, kind, localDate string) error
+	// StreakReminderCandidates returns users with streak emails on and a
+	// verified email who played the daily round since t.
+	StreakReminderCandidates(ctx context.Context, since time.Time) ([]User, error)
 
 	Ping(ctx context.Context) error
 	Close()

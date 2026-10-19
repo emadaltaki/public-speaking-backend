@@ -36,6 +36,9 @@ func (b Brevo) Send(ctx context.Context, m Message) error {
 	if m.HTML != "" {
 		payload["htmlContent"] = m.HTML
 	}
+	if len(m.Headers) > 0 {
+		payload["headers"] = m.Headers
+	}
 	body, _ := json.Marshal(payload)
 	url := b.URL
 	if url == "" {

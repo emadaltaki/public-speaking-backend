@@ -78,11 +78,11 @@ func (p *Postgres) migrate(ctx context.Context) error {
 func (p *Postgres) Ping(ctx context.Context) error { return p.pool.Ping(ctx) }
 func (p *Postgres) Close()                         { p.pool.Close() }
 
-const userCols = `uid, email, display_name, photo_url, language, avatar, email_verified, created_at, last_seen_at`
+const userCols = `uid, email, display_name, photo_url, language, avatar, email_verified, time_zone, streak_emails, created_at, last_seen_at`
 
 func scanUser(row pgx.Row) (User, error) {
 	var u User
-	err := row.Scan(&u.UID, &u.Email, &u.DisplayName, &u.PhotoURL, &u.Language, &u.Avatar, &u.EmailVerified, &u.CreatedAt, &u.LastSeenAt)
+	err := row.Scan(&u.UID, &u.Email, &u.DisplayName, &u.PhotoURL, &u.Language, &u.Avatar, &u.EmailVerified, &u.TimeZone, &u.StreakEmails, &u.CreatedAt, &u.LastSeenAt)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return u, ErrNotFound
 	}
@@ -113,9 +113,11 @@ func (p *Postgres) UpdateUser(ctx context.Context, uid string, upd UserUpdate) (
 		UPDATE users SET
 			display_name = COALESCE($2, display_name),
 			language = COALESCE($3, language),
-			avatar = CASE WHEN $4::text IS NULL THEN avatar ELSE NULLIF($4, '') END
+			avatar = CASE WHEN $4::text IS NULL THEN avatar ELSE NULLIF($4, '') END,
+			time_zone = COALESCE($5, time_zone),
+			streak_emails = COALESCE($6, streak_emails)
 		WHERE uid = $1
-		RETURNING `+userCols, uid, upd.DisplayName, upd.Language, upd.Avatar))
+		RETURNING `+userCols, uid, upd.DisplayName, upd.Language, upd.Avatar, upd.TimeZone, upd.StreakEmails))
 }
 
 func (p *Postgres) AddGameSession(ctx context.Context, s GameSession) (GameSession, error) {
@@ -287,6 +289,43 @@ func (p *Postgres) CodeSendsSince(ctx context.Context, uid string, t time.Time) 
 			return nil, err
 		}
 		out = append(out, at)
+	}
+	return out, rows.Err()
+}
+
+func (p *Postgres) MarkStreakEmail(ctx context.Context, uid, kind, localDate string) (bool, error) {
+	tag, err := p.pool.Exec(ctx, `
+		INSERT INTO streak_email_log (uid, kind, local_date) VALUES ($1, $2, $3::date)
+		ON CONFLICT DO NOTHING`, uid, kind, localDate)
+	if err != nil {
+		return false, err
+	}
+	return tag.RowsAffected() == 1, nil
+}
+
+func (p *Postgres) UnmarkStreakEmail(ctx context.Context, uid, kind, localDate string) error {
+	_, err := p.pool.Exec(ctx,
+		`DELETE FROM streak_email_log WHERE uid = $1 AND kind = $2 AND local_date = $3::date`, uid, kind, localDate)
+	return err
+}
+
+func (p *Postgres) StreakReminderCandidates(ctx context.Context, since time.Time) ([]User, error) {
+	rows, err := p.pool.Query(ctx, `
+		SELECT `+userCols+` FROM users
+		WHERE streak_emails AND email_verified AND email <> ''
+		AND EXISTS (SELECT 1 FROM game_sessions g
+		            WHERE g.uid = users.uid AND g.game_id = 'daily' AND g.played_at > $1)`, since)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []User
+	for rows.Next() {
+		u, err := scanUser(rows)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, u)
 	}
 	return out, rows.Err()
 }

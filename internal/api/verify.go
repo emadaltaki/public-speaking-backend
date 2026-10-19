@@ -8,7 +8,6 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"html"
 	"math/big"
 	"net/http"
 	"net/url"
@@ -89,7 +88,7 @@ func (s *Server) sendVerifyCode(w http.ResponseWriter, r *http.Request) {
 		s.serverError(w, "put email code", err)
 		return
 	}
-	msg := codeEmail(code, s.verifyURL(u.UID, code), u.Language)
+	msg := s.codeEmail(code, s.verifyURL(u.UID, code), u.Language)
 	msg.To = u.Email
 	ctx, cancel := context.WithTimeout(r.Context(), 15*time.Second)
 	defer cancel()
@@ -149,6 +148,7 @@ func (s *Server) verifyCode(ctx context.Context, u store.User, code string) (res
 	if err := s.store.SetEmailVerified(ctx, u.UID); err != nil {
 		return "", 0, err
 	}
+	s.maybeWelcome(ctx, u)
 	if err := s.store.DeleteEmailCode(ctx, u.UID); err != nil {
 		s.log.Error("delete email code", "err", err)
 	}
@@ -202,43 +202,4 @@ func (s *Server) verifyLink(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) verifyURL(uid, code string) string {
 	return s.cfg.PublicURL + "/v1/verify/link?u=" + url.QueryEscape(uid) + "&c=" + code
-}
-
-func codeEmail(code, link, language string) mail.Message {
-	t := struct{ subject, hi, intro, button, or, expires, sign string }{
-		"Your Speak Up Fearless code: " + code,
-		"Hi there,",
-		"Tap the button to verify your email, or enter this code on the site:",
-		"Verify my email",
-		"Your code",
-		"It expires in 10 minutes. If you didn't sign up, you can ignore this email.",
-		"Speak Up Fearless",
-	}
-	dir := "ltr"
-	if language == "ar" {
-		t = struct{ subject, hi, intro, button, or, expires, sign string }{
-			"رمز Speak Up Fearless الخاص بك: " + code,
-			"مرحبًا،",
-			"اضغط الزر لتأكيد بريدك الإلكتروني، أو أدخل هذا الرمز في الموقع:",
-			"تأكيد بريدي الإلكتروني",
-			"رمزك",
-			"تنتهي صلاحية الرمز خلال 10 دقائق. إذا لم تقم بالتسجيل، يمكنك تجاهل هذه الرسالة.",
-			"Speak Up Fearless",
-		}
-		dir = "rtl"
-	}
-	text := t.hi + "\n\n" + t.intro + "\n\n" + code + "\n\n" + t.button + ": " + link + "\n\n" + t.expires + "\n\n" + t.sign
-	esc := html.EscapeString
-	htmlBody := `<!doctype html><html dir="` + dir + `"><body style="margin:0;background:#F3E3C8;font-family:Inter,Segoe UI,Arial,sans-serif;color:#2B1D14">
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td align="center" style="padding:32px 16px">
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:480px;background:#FFFAF3;border-radius:20px;padding:32px">
-<tr><td style="font-size:20px;font-weight:700;padding-bottom:16px">` + esc(t.sign) + `</td></tr>
-<tr><td style="font-size:16px;line-height:1.5;padding-bottom:8px">` + esc(t.hi) + `</td></tr>
-<tr><td style="font-size:16px;line-height:1.5;padding-bottom:24px">` + esc(t.intro) + `</td></tr>
-<tr><td align="center" style="padding-bottom:24px"><a href="` + esc(link) + `" style="display:inline-block;background:#C2622D;color:#ffffff;text-decoration:none;font-weight:700;font-size:17px;padding:14px 32px;border-radius:999px">` + esc(t.button) + `</a></td></tr>
-<tr><td align="center" style="font-size:13px;color:#7A6656;padding-bottom:6px">` + esc(t.or) + `</td></tr>
-<tr><td align="center" style="font-size:34px;font-weight:700;letter-spacing:8px;padding-bottom:24px">` + code + `</td></tr>
-<tr><td style="font-size:13px;line-height:1.5;color:#7A6656">` + esc(t.expires) + `</td></tr>
-</table></td></tr></table></body></html>`
-	return mail.Message{Subject: t.subject, Text: text, HTML: htmlBody}
 }

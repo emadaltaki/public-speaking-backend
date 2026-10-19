@@ -12,6 +12,7 @@ import (
 	"strings"
 	"syscall"
 	"time"
+	_ "time/tzdata" // time zones for streak emails, even where the host has none
 
 	"github.com/emadaltaki/public-speaking-backend/internal/api"
 	"github.com/emadaltaki/public-speaking-backend/internal/auth"
@@ -83,12 +84,16 @@ func run(log *slog.Logger) error {
 	}
 
 	srv := api.NewServer(api.Config{
-		AllowedOrigins: list(env("ALLOWED_ORIGINS", "https://public-speaking-lemon.vercel.app")),
-		AllowLocalhost: env("ALLOW_LOCALHOST", "true") == "true",
-		AdminEmails:    list(os.Getenv("ADMIN_EMAILS")),
-		Mailer:         mailer,
-		SiteURL:        strings.TrimRight(env("SITE_URL", "https://public-speaking-lemon.vercel.app"), "/"),
-		PublicURL:      strings.TrimRight(env("PUBLIC_URL", "https://public-speaking-backend.vercel.app"), "/"),
+		AllowedOrigins:  list(env("ALLOWED_ORIGINS", "https://public-speaking-lemon.vercel.app")),
+		AllowLocalhost:  env("ALLOW_LOCALHOST", "true") == "true",
+		AdminEmails:     list(os.Getenv("ADMIN_EMAILS")),
+		Mailer:          mailer,
+		SiteURL:         strings.TrimRight(env("SITE_URL", "https://public-speaking-lemon.vercel.app"), "/"),
+		PublicURL:       strings.TrimRight(env("PUBLIC_URL", "https://public-speaking-backend.vercel.app"), "/"),
+		CronSecret:      os.Getenv("CRON_SECRET"),
+		EmailMode:       emailMode(os.Getenv("STREAK_EMAILS")),
+		EmailTestList:   list(os.Getenv("STREAK_EMAILS_TEST")),
+		DefaultTimeZone: env("DEFAULT_TIME_ZONE", "America/Toronto"),
 	}, st, auth.NewFirebaseVerifier(projectID), log)
 
 	httpServer := &http.Server{
@@ -135,4 +140,15 @@ func list(s string) []string {
 		}
 	}
 	return out
+}
+
+// emailMode reads STREAK_EMAILS: "on", "test" or anything else for "off".
+func emailMode(v string) string {
+	switch strings.ToLower(strings.TrimSpace(v)) {
+	case "on":
+		return "on"
+	case "test":
+		return "test"
+	}
+	return "off"
 }

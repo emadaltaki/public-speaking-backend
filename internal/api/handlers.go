@@ -45,9 +45,11 @@ func (s *Server) getMe(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) patchMe(w http.ResponseWriter, r *http.Request) {
 	var req struct {
-		DisplayName *string `json:"displayName"`
-		Language    *string `json:"language"`
-		Avatar      *string `json:"avatar"`
+		DisplayName  *string `json:"displayName"`
+		Language     *string `json:"language"`
+		Avatar       *string `json:"avatar"`
+		TimeZone     *string `json:"timeZone"`
+		StreakEmails *bool   `json:"streakEmails"`
 	}
 	if !decodeJSON(w, r, &req) {
 		return
@@ -70,10 +72,19 @@ func (s *Server) patchMe(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
+	// An unknown time zone is ignored rather than rejected, so an odd
+	// browser value never blocks a profile save.
+	if req.TimeZone != nil {
+		if _, err := time.LoadLocation(*req.TimeZone); err != nil || *req.TimeZone == "" || len(*req.TimeZone) > 64 || *req.TimeZone == "Local" {
+			req.TimeZone = nil
+		}
+	}
 	u, err := s.store.UpdateUser(r.Context(), userFrom(r.Context()).UID, store.UserUpdate{
-		DisplayName: req.DisplayName,
-		Language:    req.Language,
-		Avatar:      req.Avatar,
+		DisplayName:  req.DisplayName,
+		Language:     req.Language,
+		Avatar:       req.Avatar,
+		TimeZone:     req.TimeZone,
+		StreakEmails: req.StreakEmails,
 	})
 	if err != nil {
 		s.serverError(w, "update user", err)
@@ -148,6 +159,9 @@ func (s *Server) addGameSession(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		s.serverError(w, "add game session", err)
 		return
+	}
+	if gs.GameID == "daily" {
+		s.afterDailyRound(r.Context(), *userFrom(r.Context()))
 	}
 	writeJSON(w, http.StatusCreated, gs)
 }

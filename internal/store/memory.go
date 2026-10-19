@@ -15,12 +15,13 @@ type Memory struct {
 	sessions []GameSession
 	codes    map[string]EmailCode
 	sends    map[string][]time.Time
+	streak   map[string]bool
 	bookings []Booking
 	nextID   int64
 }
 
 func NewMemory() *Memory {
-	return &Memory{users: map[string]User{}, codes: map[string]EmailCode{}, sends: map[string][]time.Time{}}
+	return &Memory{users: map[string]User{}, codes: map[string]EmailCode{}, sends: map[string][]time.Time{}, streak: map[string]bool{}}
 }
 
 func (m *Memory) id() int64 { m.nextID++; return m.nextID }
@@ -35,6 +36,7 @@ func (m *Memory) UpsertUser(_ context.Context, u User) (User, error) {
 	existing, ok := m.users[u.UID]
 	if !ok {
 		u.Language = "en"
+		u.StreakEmails = true
 		u.CreatedAt, u.LastSeenAt = now, now
 		m.users[u.UID] = u
 		return u, nil
@@ -76,6 +78,12 @@ func (m *Memory) UpdateUser(_ context.Context, uid string, upd UserUpdate) (User
 	}
 	if upd.Language != nil {
 		u.Language = *upd.Language
+	}
+	if upd.TimeZone != nil {
+		u.TimeZone = *upd.TimeZone
+	}
+	if upd.StreakEmails != nil {
+		u.StreakEmails = *upd.StreakEmails
 	}
 	if upd.Avatar != nil {
 		if *upd.Avatar == "" {
@@ -261,5 +269,53 @@ func (m *Memory) ShiftSends(uid string, d time.Duration) {
 	defer m.mu.Unlock()
 	for i := range m.sends[uid] {
 		m.sends[uid][i] = m.sends[uid][i].Add(d)
+	}
+}
+
+func (m *Memory) MarkStreakEmail(_ context.Context, uid, kind, localDate string) (bool, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	key := uid + "|" + kind + "|" + localDate
+	if m.streak[key] {
+		return false, nil
+	}
+	m.streak[key] = true
+	return true, nil
+}
+
+func (m *Memory) UnmarkStreakEmail(_ context.Context, uid, kind, localDate string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	delete(m.streak, uid+"|"+kind+"|"+localDate)
+	return nil
+}
+
+func (m *Memory) StreakReminderCandidates(_ context.Context, since time.Time) ([]User, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	played := map[string]bool{}
+	for _, s := range m.sessions {
+		if s.GameID == "daily" && s.PlayedAt.After(since) {
+			played[s.UID] = true
+		}
+	}
+	var out []User
+	for uid := range played {
+		if u := m.users[uid]; u.StreakEmails && u.EmailVerified && u.Email != "" {
+			out = append(out, u)
+		}
+	}
+	return out, nil
+}
+
+// SetPlayedAt moves a recorded game session's time. Tests use it to build a
+// streak over past days.
+func (m *Memory) SetPlayedAt(id int64, at time.Time) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	for i := range m.sessions {
+		if m.sessions[i].ID == id {
+			m.sessions[i].PlayedAt = at
+		}
 	}
 }
