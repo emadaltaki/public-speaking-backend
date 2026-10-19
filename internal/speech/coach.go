@@ -74,6 +74,7 @@ type Feedback struct {
 
 type CoachInput struct {
 	Topic           string
+	Style           string // default, serious, funny, inspiring, persuasive or story
 	Lang            string
 	DurationSeconds float64
 	Metrics         Metrics
@@ -121,7 +122,7 @@ Score each area from 1 to 10:
 - flow: how well words and ideas connect: transitions, logical order, sentences that build on each other, a clear start and finish.
 "overall" is your holistic 1-10 judgement, not a strict average.
 
-Pace: the measurements include words per minute for each 15-second stretch. Use them to say whether the speaker kept a steady pace or sped up (often when nervous or near the end) or slowed down, and mention when.
+Pace: the measurements include words per minute for each 30-second stretch. Use them to say whether the speaker kept a steady pace or sped up (often when nervous or near the end) or slowed down, and mention when.
 
 Filler words: every word in {braces} was counted as a filler. Count all of them, notice whether they cluster (at the start, between ideas, when searching for words), and name the most frequent ones in the fillers summary.
 
@@ -244,11 +245,12 @@ Words: %d
 Words per minute: %d
 Filler words: %d (%s)
 Pauses longer than 1.5s: %d (longest %.1fs)
-Words per minute in each 15-second stretch: %s
+Words per minute in each 30-second stretch: %s
+Style the speaker is going for: %s
 
 Transcript:
 %s`, topic, in.DurationSeconds, in.Metrics.WordCount, in.Metrics.WordsPerMinute,
-		in.Metrics.FillerCount, strings.Join(fillers, ", "), in.Metrics.LongPauses, in.Metrics.LongestPauseSeconds, paceLine(in.Metrics.PaceTimeline), in.Transcript)
+		in.Metrics.FillerCount, strings.Join(fillers, ", "), in.Metrics.LongPauses, in.Metrics.LongestPauseSeconds, paceLine(in.Metrics.PaceTimeline), styleLine(in.Style), in.Transcript)
 
 	resp, err := c.client.Beta.Messages.New(ctx, anthropic.BetaMessageNewParams{
 		Model:     c.model,
@@ -283,6 +285,25 @@ Transcript:
 		return Feedback{}, fmt.Errorf("claude: unreadable feedback (stop reason %s): %w", resp.StopReason, err)
 	}
 	return Clean(fb, in.DurationSeconds), nil
+}
+
+// Styles a speaker can pick before recording, and what each asks of them.
+var styles = map[string]string{
+	"serious":    "serious and professional: calm authority, clear structure, few jokes",
+	"funny":      "funny: playful energy, setups and punchlines, pauses that let a joke land",
+	"inspiring":  "inspiring: warmth, conviction, a memorable message and a strong close",
+	"persuasive": "persuasive: a clear claim, reasons and examples, and a call to action",
+	"story":      "storytelling: a clear sequence, vivid detail and a point to the story",
+}
+
+// Styles reports whether s is a known style.
+func Styles(s string) bool { _, ok := styles[s]; return ok }
+
+func styleLine(s string) string {
+	if d, ok := styles[s]; ok {
+		return d + ". Judge the delivery and structure against this intent, and say in the feedback how well it came across."
+	}
+	return "not specified: judge it as a general practice talk"
 }
 
 func paceLine(p []int) string {
