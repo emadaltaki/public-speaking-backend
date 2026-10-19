@@ -76,8 +76,11 @@ await http.post(
 | `STREAK_EMAILS_TEST` | empty | Comma-separated addresses that get emails in `test` mode |
 | `CRON_SECRET` | empty | Long random string. Protects the reminder endpoint and signs unsubscribe links; welcome and streak emails stay off without it. Also add it as a GitHub Actions repository secret with the same name |
 | `DEFAULT_TIME_ZONE` | `America/Toronto` | Used for people whose browser hasn't sent a time zone yet |
-| `ELEVENLABS_API_KEY` | empty | Speech-to-text for the speaking coach. The coach is off (503) until both keys are set |
-| `ANTHROPIC_API_KEY` | empty | Claude, which writes the coach's scores and feedback (model `claude-opus-5-5`) |
+| `DEEPGRAM_API_KEY` | empty | Speech-to-text for the speaking coach (Deepgram nova-3, filler words kept). The coach is off (503) until a speech-to-text key and `ANTHROPIC_API_KEY` are set |
+| `DEEPGRAM_MODEL` | `nova-3` | Deepgram speech-to-text model |
+| `ELEVENLABS_API_KEY` | empty | Optional. With Deepgram set, Arabic recordings use ElevenLabs Scribe instead; on its own it handles every recording |
+| `ANTHROPIC_API_KEY` | empty | Claude, which writes the coach's scores and feedback |
+| `CLAUDE_COACH_MODEL` | `claude-sonnet-5-5` | Claude model for the coach (e.g. `claude-opus-5-5`) |
 | `ELEVENLABS_STT_MODEL` | `scribe_v2` | ElevenLabs speech-to-text model |
 | `BREVO_API_KEY` | empty | Send verification emails through Brevo (free, 300/day) instead of SMTP. Needs `MAIL_FROM` set to a sender confirmed in Brevo |
 | `SITE_URL` | `https://speakup-ca500.web.app` | Where the email button sends people after verifying |
