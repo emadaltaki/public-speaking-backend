@@ -34,6 +34,7 @@ var speechAudioTypes = map[string]string{
 // speechBody is a saved report; id and createdAt come from the database row.
 type speechBody struct {
 	Topic           string           `json:"topic"`
+	Style           string           `json:"style,omitempty"`
 	Lang            string           `json:"lang"`
 	DurationSeconds float64          `json:"durationSeconds"`
 	Overall         int              `json:"overall"`
@@ -120,6 +121,10 @@ func (s *Server) analyzeSpeech(w http.ResponseWriter, r *http.Request) {
 		lang = "ar"
 	}
 	topic := strings.TrimSpace(r.FormValue("topic"))
+	style := r.FormValue("style")
+	if !speech.Styles(style) {
+		style = ""
+	}
 	if utf8.RuneCountInString(topic) > 200 {
 		topic = string([]rune(topic)[:200])
 	}
@@ -165,7 +170,7 @@ func (s *Server) analyzeSpeech(w http.ResponseWriter, r *http.Request) {
 
 	coachCtx, cancel := context.WithTimeout(r.Context(), 75*time.Second)
 	fb, err := s.cfg.Coach.Evaluate(coachCtx, speech.CoachInput{
-		Topic: topic, Lang: lang, DurationSeconds: duration, Metrics: metrics,
+		Topic: topic, Style: style, Lang: lang, DurationSeconds: duration, Metrics: metrics,
 		Transcript: speech.PromptTranscript(tokens),
 	})
 	cancel()
@@ -176,7 +181,7 @@ func (s *Server) analyzeSpeech(w http.ResponseWriter, r *http.Request) {
 	}
 
 	body := speechBody{
-		Topic: topic, Lang: lang, DurationSeconds: duration, Overall: fb.Overall, Scores: fb.Scores, Story: &fb.Story, Practice: &fb.Practice,
+		Topic: topic, Style: style, Lang: lang, DurationSeconds: duration, Overall: fb.Overall, Scores: fb.Scores, Story: &fb.Story, Practice: &fb.Practice,
 		Metrics: &metrics, Moments: fb.Moments, Strengths: fb.Strengths, NextStep: fb.NextStep, Transcript: tokens,
 	}
 	raw, _ := json.Marshal(body)

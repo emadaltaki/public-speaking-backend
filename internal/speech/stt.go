@@ -60,6 +60,8 @@ func (e ElevenLabs) Transcribe(ctx context.Context, audio []byte, filename, cont
 	_ = mw.WriteField("language_code", lang)
 	_ = mw.WriteField("timestamps_granularity", "word")
 	_ = mw.WriteField("tag_audio_events", "false")
+	// Keep every "um", "uh" and false start: they're what the coach counts.
+	_ = mw.WriteField("no_verbatim", "false")
 	if err := mw.Close(); err != nil {
 		return nil, err
 	}

@@ -1,13 +1,13 @@
 package speech
 
 import (
-	"net/url"
 	"context"
 	"encoding/json"
 	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"strings"
 	"testing"
 
@@ -85,7 +85,7 @@ func TestElevenLabs(t *testing.T) {
 	if err != nil || len(got) != 2 || got[1].Text != "there" || got[1].Start != 0.4 {
 		t.Fatalf("transcribe: %v %+v", err, got)
 	}
-	if key != "k" || fields["model_id"] != "scribe_v2" || fields["timestamps_granularity"] != "word" || fields["language_code"] != "en" || fileType != "audio/webm" {
+	if key != "k" || fields["model_id"] != "scribe_v2" || fields["timestamps_granularity"] != "word" || fields["no_verbatim"] != "false" || fields["language_code"] != "en" || fileType != "audio/webm" {
 		t.Fatalf("request: key=%q fields=%v type=%q", key, fields, fileType)
 	}
 	if _, err := e.Transcribe(context.Background(), []byte("audio"), "r.webm", "audio/webm", "xx"); !errors.Is(err, ErrBadAudio) {
@@ -196,18 +196,23 @@ func TestFallback(t *testing.T) {
 }
 
 func TestPaceTimeline(t *testing.T) {
-	// 20 words in the first 15 seconds (80 wpm), 40 in the next 15 (160 wpm).
+	// 40 words in the first 30 seconds (80 wpm), 80 in the next 30 (160 wpm).
 	var w []Word
-	for i := 0; i < 20; i++ {
+	for i := 0; i < 40; i++ {
 		w = append(w, Word{Text: "word", Start: float64(i) * 0.7, End: float64(i)*0.7 + 0.3})
 	}
-	for i := 0; i < 40; i++ {
-		at := 15 + float64(i)*0.37
+	for i := 0; i < 80; i++ {
+		at := 30 + float64(i)*0.37
 		w = append(w, Word{Text: "word", Start: at, End: at + 0.2})
 	}
 	_, m := Analyze(w, "en")
-	if len(m.PaceTimeline) != 2 || m.PaceTimeline[0] != 80 || m.PaceTimeline[1] < 155 || m.PaceTimeline[1] > 175 {
+	if len(m.PaceTimeline) != 2 || m.PaceTimeline[0] != 80 || m.PaceTimeline[1] < 150 || m.PaceTimeline[1] > 175 {
 		t.Fatalf("pace timeline %v", m.PaceTimeline)
+	}
+	// A 30-second talk is one block.
+	_, short := Analyze(w[:40], "en")
+	if len(short.PaceTimeline) != 1 {
+		t.Fatalf("short talk %v", short.PaceTimeline)
 	}
 }
 

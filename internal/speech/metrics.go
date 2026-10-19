@@ -31,16 +31,16 @@ type Metrics struct {
 	Fillers             map[string]int `json:"fillers"`
 	LongPauses          int            `json:"longPauses"`
 	LongestPauseSeconds float64        `json:"longestPauseSeconds"`
-	// PaceTimeline is words per minute in each 15-second stretch, so the
+	// PaceTimeline is words per minute in each 30-second stretch, so the
 	// report can show where they sped up or slowed down.
-	PaceTimeline []int `json:"paceTimeline"`
-	Pauses              []Pause        `json:"-"` // start times, for the prompt
+	PaceTimeline []int   `json:"paceTimeline"`
+	Pauses       []Pause `json:"-"` // start times, for the prompt
 }
 
 var (
 	fillersEN = map[string]bool{
 		"um": true, "umm": true, "uh": true, "uhh": true, "er": true, "erm": true, "ah": true,
-		"hmm": true, "mm": true, "like": true, "basically": true, "actually": true, "literally": true,
+		"hmm": true, "hm": true, "mm": true, "uhm": true, "eh": true, "like": true, "basically": true, "actually": true, "literally": true,
 	}
 	phrasesEN = []string{"you know", "i mean", "sort of", "kind of"}
 	fillersAR = map[string]bool{
@@ -129,10 +129,11 @@ func Analyze(words []Word, lang string) ([]Token, Metrics) {
 	return tokens, m
 }
 
-// PaceWindow is the length, in seconds, of each stretch in the pace timeline.
-const PaceWindow = 15.0
+// PaceWindow is the length, in seconds, of each stretch in the pace timeline:
+// one block for a 30-second talk, two for a minute.
+const PaceWindow = 30.0
 
-// paceTimeline counts the words started in each 15-second window and turns
+// paceTimeline counts the words started in each 30-second window and turns
 // them into words per minute. A short last window is scaled to its length,
 // and dropped when it is under 5 seconds.
 func paceTimeline(words []Word, norm []string) []int {
@@ -157,7 +158,7 @@ func paceTimeline(words []Word, norm []string) []int {
 		length := PaceWindow
 		if k == n-1 {
 			length = end - start - PaceWindow*float64(n-1)
-			if length < 5 && n > 1 {
+			if length < 8 && n > 1 {
 				break
 			}
 		}
