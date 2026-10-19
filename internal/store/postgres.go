@@ -3,6 +3,7 @@ package store
 import (
 	"context"
 	"embed"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io/fs"
@@ -328,4 +329,52 @@ func (p *Postgres) StreakReminderCandidates(ctx context.Context, since time.Time
 		out = append(out, u)
 	}
 	return out, rows.Err()
+}
+
+func (p *Postgres) AddSpeechReport(ctx context.Context, uid string, report json.RawMessage) (SpeechReport, error) {
+	r := SpeechReport{Report: report}
+	err := p.pool.QueryRow(ctx,
+		`INSERT INTO speech_reports (uid, report) VALUES ($1, $2) RETURNING id, created_at`, uid, []byte(report)).
+		Scan(&r.ID, &r.CreatedAt)
+	return r, err
+}
+
+func (p *Postgres) ListSpeechReports(ctx context.Context, uid string, limit int) ([]SpeechReport, error) {
+	rows, err := p.pool.Query(ctx, `
+		SELECT id, created_at, report - 'transcript' - 'moments' - 'metrics'
+		FROM speech_reports WHERE uid = $1 ORDER BY created_at DESC, id DESC LIMIT $2`, uid, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := []SpeechReport{}
+	for rows.Next() {
+		var r SpeechReport
+		var body []byte
+		if err := rows.Scan(&r.ID, &r.CreatedAt, &body); err != nil {
+			return nil, err
+		}
+		r.Report = body
+		out = append(out, r)
+	}
+	return out, rows.Err()
+}
+
+func (p *Postgres) GetSpeechReport(ctx context.Context, uid string, id int64) (SpeechReport, error) {
+	r := SpeechReport{ID: id}
+	var body []byte
+	err := p.pool.QueryRow(ctx,
+		`SELECT created_at, report FROM speech_reports WHERE uid = $1 AND id = $2`, uid, id).Scan(&r.CreatedAt, &body)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return r, ErrNotFound
+	}
+	r.Report = body
+	return r, err
+}
+
+func (p *Postgres) CountSpeechReportsSince(ctx context.Context, uid string, since time.Time) (int, error) {
+	var n int
+	err := p.pool.QueryRow(ctx,
+		`SELECT count(*) FROM speech_reports WHERE uid = $1 AND created_at > $2`, uid, since).Scan(&n)
+	return n, err
 }

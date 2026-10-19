@@ -2,6 +2,7 @@ package store
 
 import (
 	"context"
+	"encoding/json"
 	"sort"
 	"sync"
 	"time"
@@ -16,6 +17,7 @@ type Memory struct {
 	codes    map[string]EmailCode
 	sends    map[string][]time.Time
 	streak   map[string]bool
+	reports  []memReport
 	bookings []Booking
 	nextID   int64
 }
@@ -318,4 +320,52 @@ func (m *Memory) SetPlayedAt(id int64, at time.Time) {
 			m.sessions[i].PlayedAt = at
 		}
 	}
+}
+
+type memReport struct {
+	uid string
+	SpeechReport
+}
+
+func (m *Memory) AddSpeechReport(_ context.Context, uid string, report json.RawMessage) (SpeechReport, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	r := SpeechReport{ID: m.id(), CreatedAt: time.Now().UTC(), Report: report}
+	m.reports = append(m.reports, memReport{uid, r})
+	return r, nil
+}
+
+func (m *Memory) ListSpeechReports(_ context.Context, uid string, limit int) ([]SpeechReport, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	out := []SpeechReport{}
+	for i := len(m.reports) - 1; i >= 0 && len(out) < limit; i-- {
+		if m.reports[i].uid == uid {
+			out = append(out, m.reports[i].SpeechReport)
+		}
+	}
+	return out, nil
+}
+
+func (m *Memory) GetSpeechReport(_ context.Context, uid string, id int64) (SpeechReport, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	for _, r := range m.reports {
+		if r.uid == uid && r.ID == id {
+			return r.SpeechReport, nil
+		}
+	}
+	return SpeechReport{}, ErrNotFound
+}
+
+func (m *Memory) CountSpeechReportsSince(_ context.Context, uid string, since time.Time) (int, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	n := 0
+	for _, r := range m.reports {
+		if r.uid == uid && r.CreatedAt.After(since) {
+			n++
+		}
+	}
+	return n, nil
 }

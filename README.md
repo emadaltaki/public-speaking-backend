@@ -36,6 +36,9 @@ All responses are JSON. Errors look like `{"error": "message"}`.
 | GET | `/v1/verify/link?u=&c=` | none | The "Verify my email" button in the code email. Verifies with the code in the link (same expiry and attempt limits), then redirects to `SITE_URL/login?verify=verified|wrong|expired` |
 | GET/POST | `/v1/cron/streak-reminders` | `Authorization: Bearer CRON_SECRET` | Run hourly (see `.github/workflows/streak-reminders.yml`). Emails people whose local time is 19:00 or later, who have a streak and haven't played the daily round today. At most once per person per day. Returns counts |
 | GET/POST | `/v1/email/unsubscribe?u=&t=` | signed link | Turns off streak emails (link and List-Unsubscribe header in every streak and welcome email), then redirects to `SITE_URL/account?emails=off` |
+| POST | `/v1/speech/analyze` | user | AI speaking coach. Multipart: `audio` (webm/opus, mp4/AAC, ogg, mp3 or wav, up to 4 MB), `topic`, `lang` (`en`/`ar`), `durationSeconds` (up to 125). ElevenLabs Scribe transcribes with word timings, the API measures pace, pauses and filler words, and Claude scores pace, pauses, fillers, clarity and flow 1-10 with feedback. The audio is never stored. Saves the report and a `speech-coach` game session. Errors `{"error","code"}`: 400 `no_speech`/`bad_audio`, 413 `too_large`, 429 `limit` (15 per user per 24 hours), 502 `upstream`, 503 `not_configured` |
+| GET | `/v1/speech/reports?limit=` | user | The user's coach reports, newest first (summary: scores and overall) |
+| GET | `/v1/speech/reports/{id}` | user | One full report: scores, metrics, moments, strengths, next step, timed transcript |
 | POST | `/v1/games/sessions` | user | Record a finished round: `gameId`, `durationSeconds`, optional `score`, optional `details` object |
 | GET | `/v1/games/sessions?gameId=&limit=` | user | Recent rounds, newest first (limit 1–200, default 50) |
 | GET | `/v1/games/progress` | user | Per game: plays, total seconds, best score, last played |
@@ -73,6 +76,9 @@ await http.post(
 | `STREAK_EMAILS_TEST` | empty | Comma-separated addresses that get emails in `test` mode |
 | `CRON_SECRET` | empty | Long random string. Protects the reminder endpoint and signs unsubscribe links; welcome and streak emails stay off without it. Also add it as a GitHub Actions repository secret with the same name |
 | `DEFAULT_TIME_ZONE` | `America/Toronto` | Used for people whose browser hasn't sent a time zone yet |
+| `ELEVENLABS_API_KEY` | empty | Speech-to-text for the speaking coach. The coach is off (503) until both keys are set |
+| `ANTHROPIC_API_KEY` | empty | Claude, which writes the coach's scores and feedback (model `claude-opus-5-5`) |
+| `ELEVENLABS_STT_MODEL` | `scribe_v2` | ElevenLabs speech-to-text model |
 | `BREVO_API_KEY` | empty | Send verification emails through Brevo (free, 300/day) instead of SMTP. Needs `MAIL_FROM` set to a sender confirmed in Brevo |
 | `SITE_URL` | `https://public-speaking-lemon.vercel.app` | Where the email button sends people after verifying |
 | `PUBLIC_URL` | `https://public-speaking-backend.vercel.app` | This API's address, used in the email button link |

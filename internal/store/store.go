@@ -44,6 +44,14 @@ type EmailCode struct {
 	Attempts  int
 }
 
+// SpeechReport is one saved AI coach report. Report is the JSON body without
+// its id and createdAt, which come from the row.
+type SpeechReport struct {
+	ID        int64
+	CreatedAt time.Time
+	Report    json.RawMessage
+}
+
 // GameSession is one finished round of a practice game.
 type GameSession struct {
 	ID              int64           `json:"id"`
@@ -113,6 +121,13 @@ type Store interface {
 	// StreakReminderCandidates returns users with streak emails on and a
 	// verified email who played the daily round since t.
 	StreakReminderCandidates(ctx context.Context, since time.Time) ([]User, error)
+
+	AddSpeechReport(ctx context.Context, uid string, report json.RawMessage) (SpeechReport, error)
+	// ListSpeechReports returns the user's reports newest first, without
+	// the transcript, moments or metrics.
+	ListSpeechReports(ctx context.Context, uid string, limit int) ([]SpeechReport, error)
+	GetSpeechReport(ctx context.Context, uid string, id int64) (SpeechReport, error)
+	CountSpeechReportsSince(ctx context.Context, uid string, since time.Time) (int, error)
 
 	Ping(ctx context.Context) error
 	Close()

@@ -12,6 +12,7 @@ import (
 
 	"github.com/emadaltaki/public-speaking-backend/internal/auth"
 	"github.com/emadaltaki/public-speaking-backend/internal/mail"
+	"github.com/emadaltaki/public-speaking-backend/internal/speech"
 	"github.com/emadaltaki/public-speaking-backend/internal/store"
 )
 
@@ -39,6 +40,10 @@ type Config struct {
 	EmailTestList []string
 	// DefaultTimeZone is used until the site sends a user's own time zone.
 	DefaultTimeZone string
+	// Transcriber and Coach power the AI speaking coach; nil until the
+	// ElevenLabs and Anthropic keys are set.
+	Transcriber speech.Transcriber
+	Coach       speech.Coach
 }
 
 type Server struct {
@@ -77,6 +82,10 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /v1/cron/streak-reminders", s.cronStreakReminders)
 	mux.HandleFunc("GET /v1/email/unsubscribe", s.unsubscribe)
 	mux.HandleFunc("POST /v1/email/unsubscribe", s.unsubscribe)
+
+	mux.Handle("POST /v1/speech/analyze", s.requireUser(s.analyzeSpeech))
+	mux.Handle("GET /v1/speech/reports", s.requireUser(s.listSpeechReports))
+	mux.Handle("GET /v1/speech/reports/{id}", s.requireUser(s.getSpeechReport))
 
 	mux.Handle("POST /v1/games/sessions", s.requireUser(s.addGameSession))
 	mux.Handle("GET /v1/games/sessions", s.requireUser(s.listGameSessions))
@@ -217,7 +226,11 @@ func (s *Server) originAllowed(origin string) bool {
 
 func limitBody(next http.Handler, n int64) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		r.Body = http.MaxBytesReader(w, r.Body, n)
+		limit := n
+		if r.URL.Path == speechAnalyzePath {
+			limit = maxSpeechUpload + 64<<10 // the recording plus form fields
+		}
+		r.Body = http.MaxBytesReader(w, r.Body, limit)
 		next.ServeHTTP(w, r)
 	})
 }

@@ -17,6 +17,7 @@ import (
 	"github.com/emadaltaki/public-speaking-backend/internal/api"
 	"github.com/emadaltaki/public-speaking-backend/internal/auth"
 	"github.com/emadaltaki/public-speaking-backend/internal/mail"
+	"github.com/emadaltaki/public-speaking-backend/internal/speech"
 	"github.com/emadaltaki/public-speaking-backend/internal/store"
 )
 
@@ -83,6 +84,18 @@ func run(log *slog.Logger) error {
 		log.Warn("no BREVO_API_KEY or SMTP settings (with MAIL_FROM): verification emails are off")
 	}
 
+	var transcriber speech.Transcriber
+	var coach speech.Coach
+	if key := os.Getenv("ELEVENLABS_API_KEY"); key != "" {
+		transcriber = speech.ElevenLabs{APIKey: key, Model: env("ELEVENLABS_STT_MODEL", "scribe_v2")}
+	}
+	if key := os.Getenv("ANTHROPIC_API_KEY"); key != "" {
+		coach = speech.NewClaude(key)
+	}
+	if transcriber == nil || coach == nil {
+		log.Warn("ELEVENLABS_API_KEY or ANTHROPIC_API_KEY not set: the speaking coach is off")
+	}
+
 	srv := api.NewServer(api.Config{
 		AllowedOrigins:  list(env("ALLOWED_ORIGINS", "https://public-speaking-lemon.vercel.app")),
 		AllowLocalhost:  env("ALLOW_LOCALHOST", "true") == "true",
@@ -94,14 +107,16 @@ func run(log *slog.Logger) error {
 		EmailMode:       emailMode(os.Getenv("STREAK_EMAILS")),
 		EmailTestList:   list(os.Getenv("STREAK_EMAILS_TEST")),
 		DefaultTimeZone: env("DEFAULT_TIME_ZONE", "America/Toronto"),
+		Transcriber:     transcriber,
+		Coach:           coach,
 	}, st, auth.NewFirebaseVerifier(projectID), log)
 
 	httpServer := &http.Server{
 		Addr:              ":" + env("PORT", "8080"),
 		Handler:           srv.Handler(),
 		ReadHeaderTimeout: 10 * time.Second,
-		ReadTimeout:       30 * time.Second,
-		WriteTimeout:      30 * time.Second,
+		ReadTimeout:       60 * time.Second,
+		WriteTimeout:      150 * time.Second, // the speaking coach can take a minute or two
 		IdleTimeout:       120 * time.Second,
 	}
 
