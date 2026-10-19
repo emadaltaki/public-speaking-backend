@@ -17,7 +17,7 @@ import (
 
 const (
 	maxSpeechUpload   = 4 << 20 // Vercel rejects request bodies over 4.5 MB
-	maxSpeechSeconds  = 125
+	maxSpeechSeconds  = 125     // the site records one minute; this leaves room for older clients
 	minSpeechWords    = 15
 	speechDailyLimit  = 15
 	speechGameID      = "speech-coach"
@@ -33,17 +33,18 @@ var speechAudioTypes = map[string]string{
 
 // speechBody is a saved report; id and createdAt come from the database row.
 type speechBody struct {
-	Topic           string          `json:"topic"`
-	Lang            string          `json:"lang"`
-	DurationSeconds float64         `json:"durationSeconds"`
-	Overall         int             `json:"overall"`
-	Scores          speech.Scores   `json:"scores"`
-	Story           *speech.Story   `json:"story,omitempty"`
-	Metrics         *speech.Metrics `json:"metrics"`
-	Moments         []speech.Moment `json:"moments"`
-	Strengths       []string        `json:"strengths"`
-	NextStep        string          `json:"nextStep"`
-	Transcript      []speech.Token  `json:"transcript"`
+	Topic           string           `json:"topic"`
+	Lang            string           `json:"lang"`
+	DurationSeconds float64          `json:"durationSeconds"`
+	Overall         int              `json:"overall"`
+	Scores          speech.Scores    `json:"scores"`
+	Story           *speech.Story    `json:"story,omitempty"`
+	Practice        *speech.Practice `json:"practice,omitempty"`
+	Metrics         *speech.Metrics  `json:"metrics"`
+	Moments         []speech.Moment  `json:"moments"`
+	Strengths       []string         `json:"strengths"`
+	NextStep        string           `json:"nextStep"`
+	Transcript      []speech.Token   `json:"transcript"`
 }
 
 type speechReport struct {
@@ -175,7 +176,7 @@ func (s *Server) analyzeSpeech(w http.ResponseWriter, r *http.Request) {
 	}
 
 	body := speechBody{
-		Topic: topic, Lang: lang, DurationSeconds: duration, Overall: fb.Overall, Scores: fb.Scores, Story: &fb.Story,
+		Topic: topic, Lang: lang, DurationSeconds: duration, Overall: fb.Overall, Scores: fb.Scores, Story: &fb.Story, Practice: &fb.Practice,
 		Metrics: &metrics, Moments: fb.Moments, Strengths: fb.Strengths, NextStep: fb.NextStep, Transcript: tokens,
 	}
 	raw, _ := json.Marshal(body)

@@ -52,11 +52,21 @@ type Story struct {
 	Connection string   `json:"connection"`
 }
 
+// Practice is the site game the coach recommends next, and why.
+type Practice struct {
+	Game   string `json:"game"`
+	Reason string `json:"reason"`
+}
+
+// Games the coach can recommend (ids match the website).
+var practiceGames = map[string]bool{"triple-step": true, "conductor": true, "podcast": true, "autocomplete": true, "daily": true}
+
 // Feedback is what the coach writes.
 type Feedback struct {
 	Overall   int      `json:"overall"`
 	Scores    Scores   `json:"scores"`
 	Story     Story    `json:"story"`
+	Practice  Practice `json:"practice"`
 	Moments   []Moment `json:"moments"`
 	Strengths []string `json:"strengths"`
 	NextStep  string   `json:"nextStep"`
@@ -120,6 +130,14 @@ Filler words: every word in {braces} was counted as a filler. Count all of them,
 - "opening", "middle", "ending": each has "rating" (strong, ok or weak) and a one-sentence "note". A strong opening hooks the listener and says what the talk is about; a strong middle develops one idea at a time with an example or story; a strong ending lands a clear final point instead of trailing off.
 - "connection": two sentences on how well the ideas link to each other and back to the topic, naming a transition that worked or a jump that felt abrupt.
 
+"practice" recommends the one Speak Up Fearless game that best trains this speaker's weakest area. Pick "game" from:
+- "autocomplete": finish sentences out loud, fast. Builds fluency and helps replace filler words with confident starts.
+- "triple-step": talk on a topic while surprise words appear. Builds thinking on your feet, focus and smooth flow between ideas.
+- "conductor": change your pitch from low to high while talking. Builds vocal variety, energy and control of pace.
+- "podcast": a group game where the mic jumps between people. Builds quick thinking and listening.
+- "daily": one minute on a new topic every day. Builds the habit of speaking and overall comfort.
+"reason" is one sentence, addressed to the speaker, linking what you heard in this recording to what the game trains.
+
 Be encouraging but honest: this person is practising to get better, and vague praise doesn't help them. Each summary is one or two sentences about this recording specifically.
 
 "moments" lists 3 to 8 specific places worth working on, in time order. For each: "at" is the start time in seconds of the sentence it comes from (from the [m:ss] mark), "category" is the area it belongs to, "quote" copies the speaker's exact words from the transcript (a short phrase, without the braces), "issue" says what went wrong, and "fix" gives one concrete thing to do differently next time, such as a better transition phrase or where to pause instead.
@@ -130,9 +148,18 @@ Write every text field in %s. Address the speaker directly as "you".`
 var feedbackSchema = json.RawMessage(`{
   "type": "object",
   "additionalProperties": false,
-  "required": ["overall", "scores", "story", "moments", "strengths", "nextStep"],
+  "required": ["overall", "scores", "story", "practice", "moments", "strengths", "nextStep"],
   "properties": {
     "overall": {"type": "integer"},
+    "practice": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["game", "reason"],
+      "properties": {
+        "game": {"type": "string", "enum": ["autocomplete", "triple-step", "conductor", "podcast", "daily"]},
+        "reason": {"type": "string"}
+      }
+    },
     "story": {
       "type": "object",
       "additionalProperties": false,
@@ -297,6 +324,9 @@ func Clean(fb Feedback, duration float64) Feedback {
 	}
 	if len(fb.Story.Outline) > 5 {
 		fb.Story.Outline = fb.Story.Outline[:5]
+	}
+	if !practiceGames[fb.Practice.Game] {
+		fb.Practice.Game = "triple-step"
 	}
 	if fb.Story.Outline == nil {
 		fb.Story.Outline = []string{}
