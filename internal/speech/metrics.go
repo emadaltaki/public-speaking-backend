@@ -31,6 +31,9 @@ type Metrics struct {
 	Fillers             map[string]int `json:"fillers"`
 	LongPauses          int            `json:"longPauses"`
 	LongestPauseSeconds float64        `json:"longestPauseSeconds"`
+	// PaceTimeline is words per minute in each 15-second stretch, so the
+	// report can show where they sped up or slowed down.
+	PaceTimeline []int `json:"paceTimeline"`
 	Pauses              []Pause        `json:"-"` // start times, for the prompt
 }
 
@@ -122,7 +125,48 @@ func Analyze(words []Word, lang string) ([]Token, Metrics) {
 			m.WordsPerMinute = int(math.Round(float64(m.WordCount) / (span / 60)))
 		}
 	}
+	m.PaceTimeline = paceTimeline(words, norm)
 	return tokens, m
+}
+
+// PaceWindow is the length, in seconds, of each stretch in the pace timeline.
+const PaceWindow = 15.0
+
+// paceTimeline counts the words started in each 15-second window and turns
+// them into words per minute. A short last window is scaled to its length,
+// and dropped when it is under 5 seconds.
+func paceTimeline(words []Word, norm []string) []int {
+	if len(words) == 0 {
+		return []int{}
+	}
+	start, end := words[0].Start, words[len(words)-1].End
+	n := int(math.Ceil((end - start) / PaceWindow))
+	if n < 1 {
+		n = 1
+	}
+	counts := make([]int, n)
+	for i, w := range words {
+		if norm[i] == "" {
+			continue
+		}
+		k := min(int((w.Start-start)/PaceWindow), n-1)
+		counts[k]++
+	}
+	out := make([]int, 0, n)
+	for k, c := range counts {
+		length := PaceWindow
+		if k == n-1 {
+			length = end - start - PaceWindow*float64(n-1)
+			if length < 5 && n > 1 {
+				break
+			}
+		}
+		if length <= 0 {
+			length = PaceWindow
+		}
+		out = append(out, int(math.Round(float64(c)/(length/60))))
+	}
+	return out
 }
 
 // PromptTranscript renders the transcript for the coach: a [m:ss] mark at the

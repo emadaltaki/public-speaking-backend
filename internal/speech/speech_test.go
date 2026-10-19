@@ -194,3 +194,26 @@ func TestFallback(t *testing.T) {
 		t.Fatalf("primary first: %v", w)
 	}
 }
+
+func TestPaceTimeline(t *testing.T) {
+	// 20 words in the first 15 seconds (80 wpm), 40 in the next 15 (160 wpm).
+	var w []Word
+	for i := 0; i < 20; i++ {
+		w = append(w, Word{Text: "word", Start: float64(i) * 0.7, End: float64(i)*0.7 + 0.3})
+	}
+	for i := 0; i < 40; i++ {
+		at := 15 + float64(i)*0.37
+		w = append(w, Word{Text: "word", Start: at, End: at + 0.2})
+	}
+	_, m := Analyze(w, "en")
+	if len(m.PaceTimeline) != 2 || m.PaceTimeline[0] != 80 || m.PaceTimeline[1] < 155 || m.PaceTimeline[1] > 175 {
+		t.Fatalf("pace timeline %v", m.PaceTimeline)
+	}
+}
+
+func TestCleanStory(t *testing.T) {
+	fb := Clean(Feedback{Story: Story{Opening: Part{Rating: "great"}, Outline: []string{"a", "b", "c", "d", "e", "f"}}}, 60)
+	if fb.Story.Opening.Rating != "ok" || len(fb.Story.Outline) != 5 || fb.Story.Middle.Rating != "ok" {
+		t.Fatalf("story not cleaned: %+v", fb.Story)
+	}
+}

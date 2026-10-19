@@ -38,6 +38,7 @@ type speechBody struct {
 	DurationSeconds float64         `json:"durationSeconds"`
 	Overall         int             `json:"overall"`
 	Scores          speech.Scores   `json:"scores"`
+	Story           *speech.Story   `json:"story,omitempty"`
 	Metrics         *speech.Metrics `json:"metrics"`
 	Moments         []speech.Moment `json:"moments"`
 	Strengths       []string        `json:"strengths"`
@@ -174,7 +175,7 @@ func (s *Server) analyzeSpeech(w http.ResponseWriter, r *http.Request) {
 	}
 
 	body := speechBody{
-		Topic: topic, Lang: lang, DurationSeconds: duration, Overall: fb.Overall, Scores: fb.Scores,
+		Topic: topic, Lang: lang, DurationSeconds: duration, Overall: fb.Overall, Scores: fb.Scores, Story: &fb.Story,
 		Metrics: &metrics, Moments: fb.Moments, Strengths: fb.Strengths, NextStep: fb.NextStep, Transcript: tokens,
 	}
 	raw, _ := json.Marshal(body)

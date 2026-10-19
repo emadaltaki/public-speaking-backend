@@ -36,10 +36,27 @@ type Moment struct {
 	Fix      string  `json:"fix"`
 }
 
+// Part is one stage of the talk's structure.
+type Part struct {
+	Rating string `json:"rating"` // strong, ok or weak
+	Note   string `json:"note"`
+}
+
+// Story is how the talk hangs together: its main points in order, how well
+// the opening, middle and ending work, and how the ideas connect.
+type Story struct {
+	Outline    []string `json:"outline"`
+	Opening    Part     `json:"opening"`
+	Middle     Part     `json:"middle"`
+	Ending     Part     `json:"ending"`
+	Connection string   `json:"connection"`
+}
+
 // Feedback is what the coach writes.
 type Feedback struct {
 	Overall   int      `json:"overall"`
 	Scores    Scores   `json:"scores"`
+	Story     Story    `json:"story"`
 	Moments   []Moment `json:"moments"`
 	Strengths []string `json:"strengths"`
 	NextStep  string   `json:"nextStep"`
@@ -94,6 +111,15 @@ Score each area from 1 to 10:
 - flow: how well words and ideas connect: transitions, logical order, sentences that build on each other, a clear start and finish.
 "overall" is your holistic 1-10 judgement, not a strict average.
 
+Pace: the measurements include words per minute for each 15-second stretch. Use them to say whether the speaker kept a steady pace or sped up (often when nervous or near the end) or slowed down, and mention when.
+
+Filler words: every word in {braces} was counted as a filler. Count all of them, notice whether they cluster (at the start, between ideas, when searching for words), and name the most frequent ones in the fillers summary.
+
+"story" describes how the talk hangs together:
+- "outline": the main points in the order the speaker made them, 2 to 5 short phrases in your own words.
+- "opening", "middle", "ending": each has "rating" (strong, ok or weak) and a one-sentence "note". A strong opening hooks the listener and says what the talk is about; a strong middle develops one idea at a time with an example or story; a strong ending lands a clear final point instead of trailing off.
+- "connection": two sentences on how well the ideas link to each other and back to the topic, naming a transition that worked or a jump that felt abrupt.
+
 Be encouraging but honest: this person is practising to get better, and vague praise doesn't help them. Each summary is one or two sentences about this recording specifically.
 
 "moments" lists 3 to 8 specific places worth working on, in time order. For each: "at" is the start time in seconds of the sentence it comes from (from the [m:ss] mark), "category" is the area it belongs to, "quote" copies the speaker's exact words from the transcript (a short phrase, without the braces), "issue" says what went wrong, and "fix" gives one concrete thing to do differently next time, such as a better transition phrase or where to pause instead.
@@ -104,9 +130,21 @@ Write every text field in %s. Address the speaker directly as "you".`
 var feedbackSchema = json.RawMessage(`{
   "type": "object",
   "additionalProperties": false,
-  "required": ["overall", "scores", "moments", "strengths", "nextStep"],
+  "required": ["overall", "scores", "story", "moments", "strengths", "nextStep"],
   "properties": {
     "overall": {"type": "integer"},
+    "story": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["outline", "opening", "middle", "ending", "connection"],
+      "properties": {
+        "outline": {"type": "array", "items": {"type": "string"}},
+        "opening": {"$ref": "#/$defs/part"},
+        "middle": {"$ref": "#/$defs/part"},
+        "ending": {"$ref": "#/$defs/part"},
+        "connection": {"type": "string"}
+      }
+    },
     "scores": {
       "type": "object",
       "additionalProperties": false,
@@ -138,6 +176,15 @@ var feedbackSchema = json.RawMessage(`{
     "nextStep": {"type": "string"}
   },
   "$defs": {
+    "part": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["rating", "note"],
+      "properties": {
+        "rating": {"type": "string", "enum": ["strong", "ok", "weak"]},
+        "note": {"type": "string"}
+      }
+    },
     "score": {
       "type": "object",
       "additionalProperties": false,
@@ -170,10 +217,11 @@ Words: %d
 Words per minute: %d
 Filler words: %d (%s)
 Pauses longer than 1.5s: %d (longest %.1fs)
+Words per minute in each 15-second stretch: %s
 
 Transcript:
 %s`, topic, in.DurationSeconds, in.Metrics.WordCount, in.Metrics.WordsPerMinute,
-		in.Metrics.FillerCount, strings.Join(fillers, ", "), in.Metrics.LongPauses, in.Metrics.LongestPauseSeconds, in.Transcript)
+		in.Metrics.FillerCount, strings.Join(fillers, ", "), in.Metrics.LongPauses, in.Metrics.LongestPauseSeconds, paceLine(in.Metrics.PaceTimeline), in.Transcript)
 
 	resp, err := c.client.Beta.Messages.New(ctx, anthropic.BetaMessageNewParams{
 		Model:     c.model,
@@ -210,6 +258,17 @@ Transcript:
 	return Clean(fb, in.DurationSeconds), nil
 }
 
+func paceLine(p []int) string {
+	if len(p) == 0 {
+		return "(not measured)"
+	}
+	parts := make([]string, len(p))
+	for i, v := range p {
+		parts[i] = fmt.Sprintf("%d:%02d %d", int(float64(i)*PaceWindow)/60, int(float64(i)*PaceWindow)%60, v)
+	}
+	return strings.Join(parts, ", ")
+}
+
 // Clean keeps the coach's output inside the documented limits.
 func Clean(fb Feedback, duration float64) Feedback {
 	clamp := func(n int) int { return min(10, max(1, n)) }
@@ -235,6 +294,17 @@ func Clean(fb Feedback, duration float64) Feedback {
 	}
 	if fb.Strengths == nil {
 		fb.Strengths = []string{}
+	}
+	if len(fb.Story.Outline) > 5 {
+		fb.Story.Outline = fb.Story.Outline[:5]
+	}
+	if fb.Story.Outline == nil {
+		fb.Story.Outline = []string{}
+	}
+	for _, p := range []*Part{&fb.Story.Opening, &fb.Story.Middle, &fb.Story.Ending} {
+		if p.Rating != "strong" && p.Rating != "weak" {
+			p.Rating = "ok"
+		}
 	}
 	return fb
 }
