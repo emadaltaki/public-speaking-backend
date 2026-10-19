@@ -76,9 +76,9 @@ await http.post(
 | `STREAK_EMAILS_TEST` | empty | Comma-separated addresses that get emails in `test` mode |
 | `CRON_SECRET` | empty | Long random string. Protects the reminder endpoint and signs unsubscribe links; welcome and streak emails stay off without it. Also add it as a GitHub Actions repository secret with the same name |
 | `DEFAULT_TIME_ZONE` | `America/Toronto` | Used for people whose browser hasn't sent a time zone yet |
-| `DEEPGRAM_API_KEY` | empty | Speech-to-text for the speaking coach (Deepgram nova-3, filler words kept). The coach is off (503) until a speech-to-text key and `ANTHROPIC_API_KEY` are set |
+| `DEEPGRAM_API_KEY` | empty | Backup speech-to-text (Deepgram nova-3), or the only one if ElevenLabs isn't set. The coach is off (503) until a speech-to-text key and `ANTHROPIC_API_KEY` are set |
 | `DEEPGRAM_MODEL` | `nova-3` | Deepgram speech-to-text model |
-| `ELEVENLABS_API_KEY` | empty | Optional. With Deepgram set, Arabic recordings use ElevenLabs Scribe instead; on its own it handles every recording |
+| `ELEVENLABS_API_KEY` | empty | Speech-to-text (ElevenLabs Scribe, keeps every filler word). Used first when set; Deepgram is the backup |
 | `ANTHROPIC_API_KEY` | empty | Claude, which writes the coach's scores and feedback |
 | `CLAUDE_COACH_MODEL` | `claude-sonnet-5-5` | Claude model for the coach (e.g. `claude-opus-5-5`) |
 | `ELEVENLABS_STT_MODEL` | `scribe_v2` | ElevenLabs speech-to-text model |

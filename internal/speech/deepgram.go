@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -101,4 +102,18 @@ func (b ByLanguage) Transcribe(ctx context.Context, audio []byte, filename, cont
 		return t.Transcribe(ctx, audio, filename, contentType, lang)
 	}
 	return b.Default.Transcribe(ctx, audio, filename, contentType, lang)
+}
+
+// Fallback tries Primary first and uses Backup when Primary fails for any
+// reason other than an unreadable recording.
+type Fallback struct {
+	Primary, Backup Transcriber
+}
+
+func (f Fallback) Transcribe(ctx context.Context, audio []byte, filename, contentType, lang string) ([]Word, error) {
+	words, err := f.Primary.Transcribe(ctx, audio, filename, contentType, lang)
+	if err == nil || errors.Is(err, ErrBadAudio) || f.Backup == nil || ctx.Err() != nil {
+		return words, err
+	}
+	return f.Backup.Transcribe(ctx, audio, filename, contentType, lang)
 }

@@ -173,3 +173,24 @@ func TestByLanguage(t *testing.T) {
 		t.Fatalf("routing: en=%v ar=%v", en, ar)
 	}
 }
+
+type failingTranscriber struct{ err error }
+
+func (f failingTranscriber) Transcribe(context.Context, []byte, string, string, string) ([]Word, error) {
+	return nil, f.err
+}
+
+func TestFallback(t *testing.T) {
+	ok := Fallback{Primary: failingTranscriber{errors.New("down")}, Backup: fixedTranscriber("backup")}
+	if w, err := ok.Transcribe(context.Background(), nil, "", "", "en"); err != nil || w[0].Text != "backup" {
+		t.Fatalf("should fall back: %v %v", w, err)
+	}
+	bad := Fallback{Primary: failingTranscriber{ErrBadAudio}, Backup: fixedTranscriber("backup")}
+	if _, err := bad.Transcribe(context.Background(), nil, "", "", "en"); !errors.Is(err, ErrBadAudio) {
+		t.Fatalf("bad audio should not fall back: %v", err)
+	}
+	first := Fallback{Primary: fixedTranscriber("primary"), Backup: fixedTranscriber("backup")}
+	if w, _ := first.Transcribe(context.Background(), nil, "", "", "en"); w[0].Text != "primary" {
+		t.Fatalf("primary first: %v", w)
+	}
+}
