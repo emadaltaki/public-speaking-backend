@@ -105,7 +105,7 @@ func run(log *slog.Logger) error {
 		PublicURL:       strings.TrimRight(env("PUBLIC_URL", "https://public-speaking-backend.vercel.app"), "/"),
 		CronSecret:      os.Getenv("CRON_SECRET"),
 		EmailMode:       emailMode(os.Getenv("STREAK_EMAILS")),
-		EmailTestList:   list(os.Getenv("STREAK_EMAILS_TEST")),
+		EmailTestList:   list(unquote(os.Getenv("STREAK_EMAILS_TEST"))),
 		DefaultTimeZone: env("DEFAULT_TIME_ZONE", "America/Toronto"),
 		Transcriber:     transcriber,
 		Coach:           coach,
@@ -159,11 +159,16 @@ func list(s string) []string {
 
 // emailMode reads STREAK_EMAILS: "on", "test" or anything else for "off".
 func emailMode(v string) string {
-	switch strings.ToLower(strings.TrimSpace(v)) {
+	switch strings.ToLower(unquote(v)) {
 	case "on":
 		return "on"
 	case "test":
 		return "test"
 	}
 	return "off"
+}
+
+// unquote drops quotes pasted around a setting's value, like "test".
+func unquote(v string) string {
+	return strings.Trim(strings.TrimSpace(v), "\"'")
 }
