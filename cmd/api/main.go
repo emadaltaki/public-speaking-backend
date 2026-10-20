@@ -36,7 +36,7 @@ func run(log *slog.Logger) error {
 	projectID := env("FIREBASE_PROJECT_ID", "speakup-ca500")
 
 	var st store.Store
-	if dbURL := os.Getenv("DATABASE_URL"); dbURL != "" {
+	if dbURL := getenv("DATABASE_URL"); dbURL != "" {
 		openCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
 		pg, err := store.OpenPostgres(openCtx, dbURL)
 		cancel()
@@ -52,11 +52,11 @@ func run(log *slog.Logger) error {
 
 	var mailer mail.Sender
 	smtpCfg := mail.SMTP{
-		Host: os.Getenv("SMTP_HOST"),
+		Host: getenv("SMTP_HOST"),
 		Port: env("SMTP_PORT", "587"),
-		User: os.Getenv("SMTP_USER"),
-		Pass: os.Getenv("SMTP_PASS"),
-		From: os.Getenv("MAIL_FROM"),
+		User: getenv("SMTP_USER"),
+		Pass: getenv("SMTP_PASS"),
+		From: getenv("MAIL_FROM"),
 	}
 	// Be forgiving: SMTP_USER may be pasted as "Name <address>", spaces in a
 	// Gmail App Password are optional, and MAIL_FROM defaults to SMTP_USER.
@@ -74,8 +74,8 @@ func run(log *slog.Logger) error {
 		}
 	}
 	switch {
-	case os.Getenv("BREVO_API_KEY") != "" && smtpCfg.From != "":
-		mailer = mail.Brevo{APIKey: os.Getenv("BREVO_API_KEY"), From: smtpCfg.From}
+	case getenv("BREVO_API_KEY") != "" && smtpCfg.From != "":
+		mailer = mail.Brevo{APIKey: getenv("BREVO_API_KEY"), From: smtpCfg.From}
 		log.Info("verification emails go through Brevo")
 	case smtpCfg.Host != "" && smtpCfg.User != "" && smtpCfg.Pass != "" && smtpCfg.From != "":
 		mailer = smtpCfg
@@ -90,10 +90,10 @@ func run(log *slog.Logger) error {
 	// its key is set; Deepgram steps in if ElevenLabs is down. Either key alone
 	// also works.
 	var elevenlabs, deepgram speech.Transcriber
-	if key := os.Getenv("ELEVENLABS_API_KEY"); key != "" {
+	if key := getenv("ELEVENLABS_API_KEY"); key != "" {
 		elevenlabs = speech.ElevenLabs{APIKey: key, Model: env("ELEVENLABS_STT_MODEL", "scribe_v2")}
 	}
-	if key := os.Getenv("DEEPGRAM_API_KEY"); key != "" {
+	if key := getenv("DEEPGRAM_API_KEY"); key != "" {
 		deepgram = speech.Deepgram{APIKey: key, Model: env("DEEPGRAM_MODEL", "nova-3")}
 	}
 	switch {
@@ -102,7 +102,7 @@ func run(log *slog.Logger) error {
 	case deepgram != nil:
 		transcriber = deepgram
 	}
-	if key := os.Getenv("ANTHROPIC_API_KEY"); key != "" {
+	if key := getenv("ANTHROPIC_API_KEY"); key != "" {
 		coach = speech.NewClaude(key).WithModel(env("CLAUDE_COACH_MODEL", "claude-sonnet-5-5"))
 	}
 	if transcriber == nil || coach == nil {
@@ -112,13 +112,13 @@ func run(log *slog.Logger) error {
 	srv := api.NewServer(api.Config{
 		AllowedOrigins:  list(env("ALLOWED_ORIGINS", "https://speakunshaken.com,https://www.speakunshaken.com,https://public-speaking-lemon.vercel.app,https://speakup-ca500.web.app,https://speakup-ca500.firebaseapp.com,https://speakup-dev.web.app,https://speakup-dev.firebaseapp.com,https://dev.speakunshaken.com,https://speakup-dev-fbb4b.web.app,https://speakup-dev-fbb4b.firebaseapp.com")),
 		AllowLocalhost:  env("ALLOW_LOCALHOST", "true") == "true",
-		AdminEmails:     list(os.Getenv("ADMIN_EMAILS")),
+		AdminEmails:     list(getenv("ADMIN_EMAILS")),
 		Mailer:          mailer,
 		SiteURL:         strings.TrimRight(env("SITE_URL", "https://speakup-ca500.web.app"), "/"),
 		PublicURL:       strings.TrimRight(env("PUBLIC_URL", "https://public-speaking-backend.vercel.app"), "/"),
-		CronSecret:      os.Getenv("CRON_SECRET"),
-		EmailMode:       emailMode(os.Getenv("STREAK_EMAILS")),
-		EmailTestList:   list(unquote(os.Getenv("STREAK_EMAILS_TEST"))),
+		CronSecret:      getenv("CRON_SECRET"),
+		EmailMode:       emailMode(getenv("STREAK_EMAILS")),
+		EmailTestList:   list(unquote(getenv("STREAK_EMAILS_TEST"))),
 		DefaultTimeZone: env("DEFAULT_TIME_ZONE", "America/Toronto"),
 		Transcriber:     transcriber,
 		Coach:           coach,
@@ -153,8 +153,20 @@ func run(log *slog.Logger) error {
 	return nil
 }
 
+// getenv reads a setting. On Vercel preview builds (the dev branch), a
+// DEV_-prefixed variable wins, e.g. DEV_DATABASE_URL over DATABASE_URL, so
+// dev settings can live next to the live ones. Production never reads them.
+func getenv(key string) string {
+	if env := os.Getenv("VERCEL_ENV"); env != "" && env != "production" {
+		if v := os.Getenv("DEV_" + key); v != "" {
+			return v
+		}
+	}
+	return os.Getenv(key)
+}
+
 func env(key, def string) string {
-	if v := os.Getenv(key); v != "" {
+	if v := getenv(key); v != "" {
 		return v
 	}
 	return def
