@@ -110,7 +110,7 @@ func run(log *slog.Logger) error {
 	}
 
 	srv := api.NewServer(api.Config{
-		AllowedOrigins:  list(env("ALLOWED_ORIGINS", "https://public-speaking-lemon.vercel.app,https://speakup-ca500.web.app,https://speakup-ca500.firebaseapp.com")),
+		AllowedOrigins:  list(env("ALLOWED_ORIGINS", "https://speakunshaken.com,https://www.speakunshaken.com,https://public-speaking-lemon.vercel.app,https://speakup-ca500.web.app,https://speakup-ca500.firebaseapp.com")),
 		AllowLocalhost:  env("ALLOW_LOCALHOST", "true") == "true",
 		AdminEmails:     list(os.Getenv("ADMIN_EMAILS")),
 		Mailer:          mailer,
