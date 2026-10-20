@@ -52,6 +52,8 @@ type speechReport struct {
 	ID        string    `json:"id"`
 	CreatedAt time.Time `json:"createdAt"`
 	speechBody
+	// Fixes is the best Fix-it stars per moment index, e.g. {"0": 3}.
+	Fixes map[string]int `json:"fixes,omitempty"`
 }
 
 type speechScoreOnly struct {
@@ -240,5 +242,13 @@ func (s *Server) getSpeechReport(w http.ResponseWriter, r *http.Request) {
 		s.serverError(w, "decode speech report", err)
 		return
 	}
-	writeJSON(w, http.StatusOK, speechReport{ID: strconv.FormatInt(row.ID, 10), CreatedAt: row.CreatedAt, speechBody: body})
+	out := speechReport{ID: strconv.FormatInt(row.ID, 10), CreatedAt: row.CreatedAt, speechBody: body, Fixes: map[string]int{}}
+	best, err := s.store.BestRetryStars(r.Context(), userFrom(r.Context()).UID, row.ID)
+	if err != nil {
+		s.log.Error("best retry stars", "err", err)
+	}
+	for m, stars := range best {
+		out.Fixes[strconv.Itoa(m)] = stars
+	}
+	writeJSON(w, http.StatusOK, out)
 }

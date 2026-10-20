@@ -42,6 +42,8 @@ type Config struct {
 	DefaultTimeZone string
 	// BuildInfo describes the deployment (e.g. "preview, using DEV_SITE_URL").
 	BuildInfo string
+	// Judge scores Fix-it attempts; nil turns /v1/speech/retry off.
+	Judge speech.Judge
 	// Transcriber and Coach power the AI speaking coach; nil until the
 	// ElevenLabs and Anthropic keys are set.
 	Transcriber speech.Transcriber
@@ -86,6 +88,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /v1/email/unsubscribe", s.unsubscribe)
 
 	mux.Handle("POST /v1/speech/analyze", s.requireUser(s.analyzeSpeech))
+	mux.Handle("POST "+speechRetryPath, s.requireUser(s.retrySpeech))
 	mux.Handle("GET /v1/speech/reports", s.requireUser(s.listSpeechReports))
 	mux.Handle("GET /v1/speech/reports/{id}", s.requireUser(s.getSpeechReport))
 
@@ -229,8 +232,11 @@ func (s *Server) originAllowed(origin string) bool {
 func limitBody(next http.Handler, n int64) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		limit := n
-		if r.URL.Path == speechAnalyzePath {
+		switch r.URL.Path {
+		case speechAnalyzePath:
 			limit = maxSpeechUpload + 64<<10 // the recording plus form fields
+		case speechRetryPath:
+			limit = maxRetryUpload + 64<<10
 		}
 		r.Body = http.MaxBytesReader(w, r.Body, limit)
 		next.ServeHTTP(w, r)

@@ -91,8 +91,9 @@ var ErrDeclined = errors.New("the coach declined to evaluate this recording")
 
 // Claude scores speeches with the Claude API.
 type Claude struct {
-	client anthropic.Client
-	model  string
+	client     anthropic.Client
+	model      string
+	retryModel string // judges Fix-it attempts; defaults to claude-opus-5-5
 }
 
 func NewClaude(apiKey string, opts ...option.RequestOption) *Claude {

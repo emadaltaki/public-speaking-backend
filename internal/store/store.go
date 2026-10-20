@@ -128,6 +128,11 @@ type Store interface {
 	ListSpeechReports(ctx context.Context, uid string, limit int) ([]SpeechReport, error)
 	GetSpeechReport(ctx context.Context, uid string, id int64) (SpeechReport, error)
 	CountSpeechReportsSince(ctx context.Context, uid string, since time.Time) (int, error)
+	// AddSpeechRetry records a Fix-it attempt on one moment of a report.
+	AddSpeechRetry(ctx context.Context, uid string, reportID int64, moment, stars int) error
+	CountSpeechRetriesSince(ctx context.Context, uid string, since time.Time) (int, error)
+	// BestRetryStars returns the best stars per moment index for a report.
+	BestRetryStars(ctx context.Context, uid string, reportID int64) (map[int]int, error)
 
 	Ping(ctx context.Context) error
 	Close()

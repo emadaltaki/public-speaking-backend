@@ -378,3 +378,35 @@ func (p *Postgres) CountSpeechReportsSince(ctx context.Context, uid string, sinc
 		`SELECT count(*) FROM speech_reports WHERE uid = $1 AND created_at > $2`, uid, since).Scan(&n)
 	return n, err
 }
+
+func (p *Postgres) AddSpeechRetry(ctx context.Context, uid string, reportID int64, moment, stars int) error {
+	_, err := p.pool.Exec(ctx,
+		`INSERT INTO speech_retries (uid, report_id, moment, stars) VALUES ($1, $2, $3, $4)`, uid, reportID, moment, stars)
+	return err
+}
+
+func (p *Postgres) CountSpeechRetriesSince(ctx context.Context, uid string, since time.Time) (int, error) {
+	var n int
+	err := p.pool.QueryRow(ctx,
+		`SELECT count(*) FROM speech_retries WHERE uid = $1 AND created_at > $2`, uid, since).Scan(&n)
+	return n, err
+}
+
+func (p *Postgres) BestRetryStars(ctx context.Context, uid string, reportID int64) (map[int]int, error) {
+	rows, err := p.pool.Query(ctx, `
+		SELECT moment, max(stars) FROM speech_retries
+		WHERE uid = $1 AND report_id = $2 GROUP BY moment`, uid, reportID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := map[int]int{}
+	for rows.Next() {
+		var m, s int
+		if err := rows.Scan(&m, &s); err != nil {
+			return nil, err
+		}
+		out[m] = s
+	}
+	return out, rows.Err()
+}

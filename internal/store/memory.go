@@ -18,6 +18,7 @@ type Memory struct {
 	sends    map[string][]time.Time
 	streak   map[string]bool
 	reports  []memReport
+	retries  []memRetry
 	bookings []Booking
 	nextID   int64
 }
@@ -368,4 +369,45 @@ func (m *Memory) CountSpeechReportsSince(_ context.Context, uid string, since ti
 		}
 	}
 	return n, nil
+}
+
+type memRetry struct {
+	uid       string
+	reportID  int64
+	moment    int
+	stars     int
+	createdAt time.Time
+}
+
+func (m *Memory) AddSpeechRetry(_ context.Context, uid string, reportID int64, moment, stars int) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.retries = append(m.retries, memRetry{uid, reportID, moment, stars, time.Now()})
+	return nil
+}
+
+func (m *Memory) CountSpeechRetriesSince(_ context.Context, uid string, since time.Time) (int, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	n := 0
+	for _, r := range m.retries {
+		if r.uid == uid && r.createdAt.After(since) {
+			n++
+		}
+	}
+	return n, nil
+}
+
+func (m *Memory) BestRetryStars(_ context.Context, uid string, reportID int64) (map[int]int, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	out := map[int]int{}
+	for _, r := range m.retries {
+		if r.uid == uid && r.reportID == reportID {
+			if best, ok := out[r.moment]; !ok || r.stars > best {
+				out[r.moment] = r.stars
+			}
+		}
+	}
+	return out, nil
 }

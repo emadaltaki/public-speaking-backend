@@ -102,8 +102,12 @@ func run(log *slog.Logger) error {
 	case deepgram != nil:
 		transcriber = deepgram
 	}
+	var judge speech.Judge
 	if key := getenv("ANTHROPIC_API_KEY"); key != "" {
-		coach = speech.NewClaude(key).WithModel(env("CLAUDE_COACH_MODEL", "claude-sonnet-5-5"))
+		claude := speech.NewClaude(key).
+			WithModel(env("CLAUDE_COACH_MODEL", "claude-sonnet-5-5")).
+			WithRetryModel(env("CLAUDE_RETRY_MODEL", "claude-opus-5-5"))
+		coach, judge = claude, claude
 	}
 	if transcriber == nil || coach == nil {
 		log.Warn("DEEPGRAM_API_KEY (or ELEVENLABS_API_KEY) or ANTHROPIC_API_KEY not set: the speaking coach is off")
@@ -123,6 +127,7 @@ func run(log *slog.Logger) error {
 		DefaultTimeZone: env("DEFAULT_TIME_ZONE", "America/Toronto"),
 		Transcriber:     transcriber,
 		Coach:           coach,
+		Judge:           judge,
 	}, st, auth.NewFirebaseVerifier(projectID), log)
 
 	httpServer := &http.Server{
