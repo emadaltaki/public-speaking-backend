@@ -114,7 +114,7 @@ func run(log *slog.Logger) error {
 		AllowLocalhost:  env("ALLOW_LOCALHOST", "true") == "true",
 		AdminEmails:     list(getenv("ADMIN_EMAILS")),
 		Mailer:          mailer,
-		SiteURL:         strings.TrimRight(env("SITE_URL", "https://speakup-ca500.web.app"), "/"),
+		SiteURL:         strings.TrimRight(env("SITE_URL", "https://speakunshaken.com"), "/"),
 		PublicURL:       strings.TrimRight(env("PUBLIC_URL", "https://public-speaking-backend.vercel.app"), "/"),
 		BuildInfo:       buildInfo(),
 		CronSecret:      getenv("CRON_SECRET"),
