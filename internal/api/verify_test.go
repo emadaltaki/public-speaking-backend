@@ -89,7 +89,7 @@ func TestVerifyFlow(t *testing.T) {
 	if rec.Code != 200 || body["sent"] != true {
 		t.Fatalf("send: %d %v", rec.Code, body)
 	}
-	if m.sent[0].to != "pw@example.com" || !strings.HasPrefix(m.sent[0].subject, "Your Speak Up Fearless code: ") ||
+	if m.sent[0].to != "pw@example.com" || !strings.HasPrefix(m.sent[0].subject, "Your speakUnshaken code: ") ||
 		!strings.Contains(m.sent[0].body, "It expires in 10 minutes. If you didn't sign up, you can ignore this email.") {
 		t.Fatalf("unexpected email: %+v", m.sent[0])
 	}

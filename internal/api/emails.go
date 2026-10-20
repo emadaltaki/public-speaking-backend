@@ -69,7 +69,7 @@ var emailLayout = template.Must(template.New("email").Parse(`<!doctype html>
     <tr><td class="hero" align="center" style="background:#B4583A;background-image:linear-gradient(135deg,#C9693F 0%,#B4583A 55%,#96452C 100%);border-radius:24px 24px 0 0;padding:32px 28px 30px;font-family:Montserrat,'Segoe UI',Arial,sans-serif">
       <a href="{{.SiteURL}}" style="text-decoration:none">
         <img src="{{.LogoURL}}" width="40" height="40" alt="" style="display:inline-block;vertical-align:middle;border-radius:11px;border:0;background:#FFFFFF">
-        <span style="display:inline-block;vertical-align:middle;margin:0 10px;font-size:16px;font-weight:800;color:#FFFFFF;letter-spacing:0.3px">Speak Up Fearless</span>
+        <span style="display:inline-block;vertical-align:middle;margin:0 10px;font-size:16px;font-weight:800;color:#FFFFFF;letter-spacing:0.3px">speakUnshaken</span>
       </a>
       {{if .Emoji}}<div style="font-size:44px;line-height:1;margin:24px 0 0">{{.Emoji}}</div>{{end}}
       <h1 class="herotitle" style="margin:16px 0 0;font-size:28px;line-height:1.25;font-weight:800;color:#FFFFFF">{{.Title}}</h1>
@@ -148,7 +148,7 @@ func (s *Server) render(v emailView, subject string) mail.Message {
 	if v.Note != "" {
 		text.WriteString(v.Note + "\n\n")
 	}
-	text.WriteString("Speak Up Fearless\n" + v.SiteURL + "\n")
+	text.WriteString("speakUnshaken\n" + v.SiteURL + "\n")
 	if v.UnsubURL != "" {
 		text.WriteString(v.UnsubLabel + ": " + v.UnsubURL + "\n")
 	}
@@ -191,7 +191,7 @@ func (s *Server) codeEmail(code, link, lang string) mail.Message {
 			ButtonLabel: "تأكيد بريدي الإلكتروني",
 			ButtonURL:   link,
 			Note:        "تنتهي صلاحية الرمز خلال 10 دقائق. إذا لم تقم بالتسجيل، يمكنك تجاهل هذه الرسالة.",
-		}, "رمز Speak Up Fearless الخاص بك: "+code)
+		}, "رمز speakUnshaken الخاص بك: "+code)
 	}
 	return s.render(emailView{
 		Preheader:   "Your code is " + code,
@@ -204,7 +204,7 @@ func (s *Server) codeEmail(code, link, lang string) mail.Message {
 		ButtonLabel: "Verify my email",
 		ButtonURL:   link,
 		Note:        "It expires in 10 minutes. If you didn't sign up, you can ignore this email.",
-	}, "Your Speak Up Fearless code: "+code)
+	}, "Your speakUnshaken code: "+code)
 }
 
 func (s *Server) welcomeEmail(u userEmailInfo) mail.Message {
@@ -213,7 +213,7 @@ func (s *Server) welcomeEmail(u userEmailInfo) mail.Message {
 			Lang:      "ar",
 			Preheader: "شكرًا لانضمامك. هكذا تبدأ.",
 			Emoji:     "🎉",
-			Title:     "أهلًا بك في Speak Up Fearless!",
+			Title:     "أهلًا بك في speakUnshaken!",
 			Subtitle:  "حسابك المجاني جاهز.",
 			Greeting:  hello(u.Name, "ar"),
 			Paragraphs: []string{
@@ -231,12 +231,12 @@ func (s *Server) welcomeEmail(u userEmailInfo) mail.Message {
 			Note:        "نصيحة: التدريب لبضع دقائق كل يوم أفضل من جلسة طويلة مرة في الأسبوع.",
 			UnsubLabel:  "إيقاف رسائل البريد",
 			UnsubURL:    u.Unsub,
-		}, "أهلًا بك في Speak Up Fearless 🎉")
+		}, "أهلًا بك في speakUnshaken 🎉")
 	}
 	return s.render(emailView{
 		Preheader: "Thanks for joining. Here's how to start.",
 		Emoji:     "🎉",
-		Title:     "Welcome to Speak Up Fearless!",
+		Title:     "Welcome to speakUnshaken!",
 		Subtitle:  "Your free account is ready.",
 		Greeting:  hello(u.Name, "en"),
 		Paragraphs: []string{
@@ -254,7 +254,7 @@ func (s *Server) welcomeEmail(u userEmailInfo) mail.Message {
 		Note:        "Tip: practising for a few minutes every day beats one long session a week.",
 		UnsubLabel:  "Stop these emails",
 		UnsubURL:    u.Unsub,
-	}, "Welcome to Speak Up Fearless 🎉")
+	}, "Welcome to speakUnshaken 🎉")
 }
 
 func (s *Server) streakStartEmail(u userEmailInfo) mail.Message {

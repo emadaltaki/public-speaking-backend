@@ -87,7 +87,7 @@ func TestWelcomeEmail(t *testing.T) {
 	// Google sign-in: verified on first call, welcomed once.
 	do(t, e.h, "GET", "/v1/me", "ada", nil)
 	do(t, e.h, "GET", "/v1/me", "ada", nil)
-	if got := e.subjects(); len(got) != 1 || !strings.Contains(got[0], "ada@example.com: Welcome to Speak Up Fearless") {
+	if got := e.subjects(); len(got) != 1 || !strings.Contains(got[0], "ada@example.com: Welcome to speakUnshaken") {
 		t.Fatalf("welcome emails: %v", got)
 	}
 	if !strings.Contains(e.m.sent[0].html, "Hi Ada,") || !strings.Contains(e.m.sent[0].html, "/v1/email/unsubscribe?u=ada&amp;t=") {

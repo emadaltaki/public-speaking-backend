@@ -32,7 +32,7 @@ func (s *Server) health(w http.ResponseWriter, r *http.Request) {
 // root answers visits to the bare API URL so a browser shows something useful.
 func (s *Server) root(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]string{
-		"service": "Speak Up Fearless API",
+		"service": "speakUnshaken API",
 		"health":  "/healthz",
 	})
 }

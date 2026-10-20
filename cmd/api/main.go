@@ -1,4 +1,4 @@
-// Command api serves the Speak Up Fearless backend.
+// Command api serves the speakUnshaken backend.
 package main
 
 import (
@@ -67,7 +67,7 @@ func run(log *slog.Logger) error {
 	if smtpCfg.From == "" {
 		smtpCfg.From = smtpCfg.User
 	}
-	// "Speak Up Fearless me@gmail.com" without angle brackets: add them.
+	// "speakUnshaken me@gmail.com" without angle brackets: add them.
 	if _, err := netmail.ParseAddress(smtpCfg.From); err != nil {
 		if i := strings.LastIndex(smtpCfg.From, " "); i > 0 && strings.Contains(smtpCfg.From[i+1:], "@") {
 			smtpCfg.From = (&netmail.Address{Name: strings.TrimSpace(smtpCfg.From[:i]), Address: smtpCfg.From[i+1:]}).String()

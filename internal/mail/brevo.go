@@ -97,7 +97,7 @@ func Hint(err error) string {
 	case err != nil && strings.HasPrefix(err.Error(), "auth:"):
 		return "The SMTP login was refused. Check SMTP_USER and SMTP_PASS (Gmail needs an App Password)."
 	case err != nil && strings.HasPrefix(err.Error(), "MAIL_FROM:"):
-		return "MAIL_FROM isn't a valid address. Use: Speak Up Fearless <you@gmail.com>"
+		return "MAIL_FROM isn't a valid address. Use: speakUnshaken <you@gmail.com>"
 	}
 	return ""
 }

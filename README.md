@@ -1,6 +1,6 @@
-# Speak Up Fearless API
+# speakUnshaken API
 
-Go backend for the Speak Up Fearless site (Flutter web on Vercel at
+Go backend for the speakUnshaken site (Flutter web on Vercel at
 https://public-speaking-lemon.vercel.app). It stores user profiles, practice
 game history and booking requests.
 
@@ -89,7 +89,7 @@ await http.post(
 | `SMTP_PORT` | `587` | 587 uses STARTTLS, 465 uses TLS |
 | `SMTP_USER` | empty | e.g. your Gmail address |
 | `SMTP_PASS` | empty | For Gmail, an App Password (Google Account > Security > 2-Step Verification > App passwords), not your normal password |
-| `MAIL_FROM` | empty | e.g. `Speak Up Fearless <you@gmail.com>`; with Gmail it must be the same address as `SMTP_USER` |
+| `MAIL_FROM` | empty | e.g. `speakUnshaken <you@gmail.com>`; with Gmail it must be the same address as `SMTP_USER` |
 
 See `.env.example`.
 

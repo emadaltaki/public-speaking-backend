@@ -19,12 +19,12 @@ func TestBrevoSend(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	b := Brevo{APIKey: "k", From: "Speak Up Fearless <me@example.com>", URL: srv.URL}
+	b := Brevo{APIKey: "k", From: "speakUnshaken <me@example.com>", URL: srv.URL}
 	if err := b.Send(context.Background(), Message{To: "you@example.com", Subject: "S", Text: "T", HTML: "<b>H</b>"}); err != nil {
 		t.Fatal(err)
 	}
 	sender := got["sender"].(map[string]any)
-	if key != "k" || sender["name"] != "Speak Up Fearless" || sender["email"] != "me@example.com" ||
+	if key != "k" || sender["name"] != "speakUnshaken" || sender["email"] != "me@example.com" ||
 		got["htmlContent"] != "<b>H</b>" || got["textContent"] != "T" {
 		t.Fatalf("unexpected request: key=%q body=%v", key, got)
 	}
