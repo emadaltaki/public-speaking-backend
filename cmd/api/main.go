@@ -98,7 +98,7 @@ func run(log *slog.Logger) error {
 	}
 	switch {
 	case elevenlabs != nil:
-		transcriber = speech.Fallback{Primary: elevenlabs, Backup: deepgram}
+		transcriber = speech.Fallback{Primary: elevenlabs, Backup: deepgram, Log: log}
 	case deepgram != nil:
 		transcriber = deepgram
 	}

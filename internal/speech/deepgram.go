@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"net/url"
 )
@@ -108,12 +109,16 @@ func (b ByLanguage) Transcribe(ctx context.Context, audio []byte, filename, cont
 // reason other than an unreadable recording.
 type Fallback struct {
 	Primary, Backup Transcriber
+	Log             *slog.Logger // optional; notes when the backup was used
 }
 
 func (f Fallback) Transcribe(ctx context.Context, audio []byte, filename, contentType, lang string) ([]Word, error) {
 	words, err := f.Primary.Transcribe(ctx, audio, filename, contentType, lang)
 	if err == nil || errors.Is(err, ErrBadAudio) || f.Backup == nil || ctx.Err() != nil {
 		return words, err
+	}
+	if f.Log != nil {
+		f.Log.Warn("speech: primary transcriber failed, using backup", "err", err)
 	}
 	return f.Backup.Transcribe(ctx, audio, filename, contentType, lang)
 }
