@@ -116,6 +116,7 @@ func run(log *slog.Logger) error {
 		Mailer:          mailer,
 		SiteURL:         strings.TrimRight(env("SITE_URL", "https://speakup-ca500.web.app"), "/"),
 		PublicURL:       strings.TrimRight(env("PUBLIC_URL", "https://public-speaking-backend.vercel.app"), "/"),
+		BuildInfo:       buildInfo(),
 		CronSecret:      getenv("CRON_SECRET"),
 		EmailMode:       emailMode(getenv("STREAK_EMAILS")),
 		EmailTestList:   list(unquote(getenv("STREAK_EMAILS_TEST"))),
@@ -157,12 +158,40 @@ func run(log *slog.Logger) error {
 // DEV_-prefixed variable wins, e.g. DEV_DATABASE_URL over DATABASE_URL, so
 // dev settings can live next to the live ones. Production never reads them.
 func getenv(key string) string {
-	if env := os.Getenv("VERCEL_ENV"); env != "" && env != "production" {
+	if isDevBuild() {
 		if v := os.Getenv("DEV_" + key); v != "" {
 			return v
 		}
 	}
 	return os.Getenv(key)
+}
+
+// isDevBuild is true on Vercel preview builds such as the dev branch.
+func isDevBuild() bool {
+	env := os.Getenv("VERCEL_ENV")
+	if env == "" {
+		return os.Getenv("VERCEL_GIT_COMMIT_REF") == "dev"
+	}
+	return env != "production"
+}
+
+// buildInfo says which kind of build this is, for /healthz. It names the
+// DEV_ settings in use but never their values.
+func buildInfo() string {
+	kind := os.Getenv("VERCEL_ENV")
+	if kind == "" {
+		kind = "unknown"
+	}
+	if !isDevBuild() {
+		return kind
+	}
+	var dev []string
+	for _, kv := range os.Environ() {
+		if k, _, _ := strings.Cut(kv, "="); strings.HasPrefix(k, "DEV_") {
+			dev = append(dev, k)
+		}
+	}
+	return kind + ", using " + strings.Join(dev, " ")
 }
 
 func env(key, def string) string {

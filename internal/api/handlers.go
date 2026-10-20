@@ -26,7 +26,11 @@ func (s *Server) health(w http.ResponseWriter, r *http.Request) {
 	if _, ok := s.store.(*store.Memory); ok {
 		database = "memory (data is lost on restart: set DATABASE_URL)"
 	}
-	writeJSON(w, code, map[string]string{"status": status, "database": database})
+	out := map[string]string{"status": status, "database": database}
+	if s.cfg.BuildInfo != "" {
+		out["build"] = s.cfg.BuildInfo
+	}
+	writeJSON(w, code, out)
 }
 
 // root answers visits to the bare API URL so a browser shows something useful.

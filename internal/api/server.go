@@ -40,6 +40,8 @@ type Config struct {
 	EmailTestList []string
 	// DefaultTimeZone is used until the site sends a user's own time zone.
 	DefaultTimeZone string
+	// BuildInfo describes the deployment (e.g. "preview, using DEV_SITE_URL").
+	BuildInfo string
 	// Transcriber and Coach power the AI speaking coach; nil until the
 	// ElevenLabs and Anthropic keys are set.
 	Transcriber speech.Transcriber
