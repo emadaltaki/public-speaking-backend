@@ -39,6 +39,12 @@ type ElevenLabs struct {
 	Client  *http.Client
 }
 
+// fillerKeyterms are the hesitation sounds Scribe is biased towards hearing.
+var fillerKeyterms = map[string][]string{
+	"en": {"um", "uh", "umm", "uhh", "er", "hmm", "you know"},
+	"ar": {"اممم", "آآ", "اه", "يعني"},
+}
+
 func (e ElevenLabs) Transcribe(ctx context.Context, audio []byte, filename, contentType, lang string) ([]Word, error) {
 	var body bytes.Buffer
 	mw := multipart.NewWriter(&body)
@@ -62,6 +68,11 @@ func (e ElevenLabs) Transcribe(ctx context.Context, audio []byte, filename, cont
 	_ = mw.WriteField("tag_audio_events", "false")
 	// Keep every "um", "uh" and false start: they're what the coach counts.
 	_ = mw.WriteField("no_verbatim", "false")
+	// Scribe still tends to tidy up short hesitations, so nudge it towards
+	// writing them down.
+	for _, k := range fillerKeyterms[lang] {
+		_ = mw.WriteField("keyterms", k)
+	}
 	if err := mw.Close(); err != nil {
 		return nil, err
 	}
