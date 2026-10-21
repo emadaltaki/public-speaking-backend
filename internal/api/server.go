@@ -87,7 +87,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /v1/email/unsubscribe", s.unsubscribe)
 	mux.HandleFunc("POST /v1/email/unsubscribe", s.unsubscribe)
 
-	mux.Handle("POST /v1/speech/analyze", s.requireUser(s.analyzeSpeech))
+	mux.Handle("POST /v1/speech/analyze", s.optionalUser(s.analyzeSpeech)) // guests send X-Guest-Id
 	mux.Handle("POST "+speechRetryPath, s.requireUser(s.retrySpeech))
 	mux.Handle("GET /v1/speech/reports", s.requireUser(s.listSpeechReports))
 	mux.Handle("GET /v1/speech/reports/{id}", s.requireUser(s.getSpeechReport))
@@ -201,7 +201,7 @@ func (s *Server) cors(next http.Handler) http.Handler {
 			h.Set("Access-Control-Allow-Origin", origin)
 			h.Add("Vary", "Origin")
 			h.Set("Access-Control-Allow-Methods", "GET, POST, PATCH, OPTIONS")
-			h.Set("Access-Control-Allow-Headers", "Authorization, Content-Type")
+			h.Set("Access-Control-Allow-Headers", "Authorization, Content-Type, X-Guest-Id")
 			h.Set("Access-Control-Max-Age", "3600")
 		}
 		if r.Method == http.MethodOptions && r.Header.Get("Access-Control-Request-Method") != "" {

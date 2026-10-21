@@ -410,3 +410,23 @@ func (p *Postgres) BestRetryStars(ctx context.Context, uid string, reportID int6
 	}
 	return out, rows.Err()
 }
+
+func (p *Postgres) CountGuestAnalysesSince(ctx context.Context, guestID, ip string, since time.Time) (int, error) {
+	var n int
+	err := p.pool.QueryRow(ctx, `
+		SELECT count(*) FROM guest_analyses
+		WHERE (guest_id = $1 OR ip = $2) AND created_at > $3`, guestID, ip, since).Scan(&n)
+	return n, err
+}
+
+func (p *Postgres) AddGuestAnalysis(ctx context.Context, guestID, ip string) (int64, error) {
+	var id int64
+	err := p.pool.QueryRow(ctx,
+		`INSERT INTO guest_analyses (guest_id, ip) VALUES ($1, $2) RETURNING id`, guestID, ip).Scan(&id)
+	return id, err
+}
+
+func (p *Postgres) DeleteGuestAnalysis(ctx context.Context, id int64) error {
+	_, err := p.pool.Exec(ctx, `DELETE FROM guest_analyses WHERE id = $1`, id)
+	return err
+}

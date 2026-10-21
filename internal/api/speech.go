@@ -22,6 +22,7 @@ const (
 	speechDailyLimit  = 15
 	speechGameID      = "speech-coach"
 	speechAnalyzePath = "/v1/speech/analyze"
+	guestDailyLimit   = 1
 )
 
 // Browsers record webm/opus (Chrome, Android) or mp4/AAC (iPhone Safari).
@@ -85,7 +86,17 @@ func (s *Server) analyzeSpeech(w http.ResponseWriter, r *http.Request) {
 		speechError(w, http.StatusServiceUnavailable, "not_configured", "the speaking coach isn't set up yet")
 		return
 	}
+	// Visitors without an account get one free try, identified by a random
+	// id their browser sends; nothing of theirs is saved.
 	u := userFrom(r.Context())
+	guestID, guestOK := "", false
+	if u == nil {
+		guestID = strings.TrimSpace(r.Header.Get("X-Guest-Id"))
+		if guestID == "" || len(guestID) > 100 {
+			writeError(w, http.StatusUnauthorized, "sign-in required")
+			return
+		}
+	}
 
 	if err := r.ParseMultipartForm(maxSpeechUpload); err != nil {
 		var tooBig *http.MaxBytesError
@@ -136,14 +147,39 @@ func (s *Server) analyzeSpeech(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	used, err := s.store.CountSpeechReportsSince(r.Context(), u.UID, time.Now().Add(-24*time.Hour))
-	if err != nil {
-		s.serverError(w, "count speech reports", err)
-		return
-	}
-	if used >= speechDailyLimit {
-		speechError(w, http.StatusTooManyRequests, "limit", "you've used today's "+strconv.Itoa(speechDailyLimit)+" analyses, try again tomorrow")
-		return
+	if u != nil {
+		used, err := s.store.CountSpeechReportsSince(r.Context(), u.UID, time.Now().Add(-24*time.Hour))
+		if err != nil {
+			s.serverError(w, "count speech reports", err)
+			return
+		}
+		if used >= speechDailyLimit {
+			speechError(w, http.StatusTooManyRequests, "limit", "you've used today's "+strconv.Itoa(speechDailyLimit)+" analyses, try again tomorrow")
+			return
+		}
+	} else {
+		ip := clientIP(r)
+		used, err := s.store.CountGuestAnalysesSince(r.Context(), guestID, ip, time.Now().Add(-24*time.Hour))
+		if err != nil {
+			s.serverError(w, "count guest analyses", err)
+			return
+		}
+		if used >= guestDailyLimit {
+			speechError(w, http.StatusTooManyRequests, "guest_limit", "you've had your free try today, sign up to keep practising")
+			return
+		}
+		// Hold the try now so parallel requests can't take more than one,
+		// and hand it back if this one doesn't produce a report.
+		tryID, err := s.store.AddGuestAnalysis(r.Context(), guestID, ip)
+		if err != nil {
+			s.serverError(w, "add guest analysis", err)
+			return
+		}
+		defer func() {
+			if !guestOK {
+				_ = s.store.DeleteGuestAnalysis(context.Background(), tryID)
+			}
+		}()
 	}
 
 	sttCtx, cancel := context.WithTimeout(r.Context(), 45*time.Second)
@@ -185,6 +221,11 @@ func (s *Server) analyzeSpeech(w http.ResponseWriter, r *http.Request) {
 	body := speechBody{
 		Topic: topic, Style: style, Lang: lang, DurationSeconds: duration, Overall: fb.Overall, Scores: fb.Scores, Story: &fb.Story, Practice: &fb.Practice,
 		Metrics: &metrics, Moments: fb.Moments, Strengths: fb.Strengths, NextStep: fb.NextStep, Transcript: tokens,
+	}
+	if u == nil {
+		guestOK = true
+		writeJSON(w, http.StatusOK, speechReport{ID: "", CreatedAt: time.Now().UTC(), speechBody: body})
+		return
 	}
 	raw, _ := json.Marshal(body)
 	saved, err := s.store.AddSpeechReport(r.Context(), u.UID, raw)

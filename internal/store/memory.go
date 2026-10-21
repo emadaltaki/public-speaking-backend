@@ -19,6 +19,7 @@ type Memory struct {
 	streak   map[string]bool
 	reports  []memReport
 	retries  []memRetry
+	guests   []memGuest
 	bookings []Booking
 	nextID   int64
 }
@@ -410,4 +411,43 @@ func (m *Memory) BestRetryStars(_ context.Context, uid string, reportID int64) (
 		}
 	}
 	return out, nil
+}
+
+type memGuest struct {
+	id        int64
+	guestID   string
+	ip        string
+	createdAt time.Time
+}
+
+func (m *Memory) CountGuestAnalysesSince(_ context.Context, guestID, ip string, since time.Time) (int, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	n := 0
+	for _, g := range m.guests {
+		if (g.guestID == guestID || g.ip == ip) && g.createdAt.After(since) {
+			n++
+		}
+	}
+	return n, nil
+}
+
+func (m *Memory) AddGuestAnalysis(_ context.Context, guestID, ip string) (int64, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	id := m.id()
+	m.guests = append(m.guests, memGuest{id, guestID, ip, time.Now()})
+	return id, nil
+}
+
+func (m *Memory) DeleteGuestAnalysis(_ context.Context, id int64) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	for i, g := range m.guests {
+		if g.id == id {
+			m.guests = append(m.guests[:i], m.guests[i+1:]...)
+			break
+		}
+	}
+	return nil
 }

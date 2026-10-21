@@ -328,6 +328,9 @@ func queryInt(r *http.Request, key string, def, lo, hi int) int {
 // clientIP uses the first X-Forwarded-For hop, which Cloud Run and most hosts
 // set to the real client address.
 func clientIP(r *http.Request) string {
+	if ip := strings.TrimSpace(r.Header.Get("X-Real-Ip")); ip != "" { // set by Vercel
+		return ip
+	}
 	if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
 		return strings.TrimSpace(strings.Split(xff, ",")[0])
 	}

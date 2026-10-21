@@ -134,6 +134,12 @@ type Store interface {
 	// BestRetryStars returns the best stars per moment index for a report.
 	BestRetryStars(ctx context.Context, uid string, reportID int64) (map[int]int, error)
 
+	// CountGuestAnalysesSince counts guest coach tries from this guest id or IP.
+	CountGuestAnalysesSince(ctx context.Context, guestID, ip string, since time.Time) (int, error)
+	AddGuestAnalysis(ctx context.Context, guestID, ip string) (int64, error)
+	// DeleteGuestAnalysis gives a guest their try back when it failed.
+	DeleteGuestAnalysis(ctx context.Context, id int64) error
+
 	Ping(ctx context.Context) error
 	Close()
 }
